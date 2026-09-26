@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/* CeyPay design tokens: from ceypay.io (Geist, #1C6EF5, glass cards r24, buttons r8).
+   Dark by default; light follows the OS unless data-theme pins it. */
+:root {
+  --brand: #1c6ef5;
+  --brand-hover: #3d86ff;
+  --brand-soft: rgba(28, 110, 245, 0.14);
+  --canvas: #000;
+  --elevated: #0a0a0a;
+  --glass: rgba(255, 255, 255, 0.05);
+  --glass-subtle: rgba(255, 255, 255, 0.035);
+  --line: rgba(255, 255, 255, 0.15);
+  --line-subtle: rgba(255, 255, 255, 0.1);
+  --ink: #fff;
+  --fg: #d4d4d8;
+  --muted: #a1a1aa;
+  --field: rgba(255, 255, 255, 0.06);
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.12);
+  --err: #f87171;
+  --err-soft: rgba(248, 113, 113, 0.12);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.12);
+  --glow: radial-gradient(60% 50% at 50% 0%, rgba(28, 110, 245, 0.35), transparent 70%);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --canvas: #fff;
+    --elevated: #f6f7f9;
+    --glass: #f7f8fa;
+    --glass-subtle: #fafbfc;
+    --line: #e4e4e7;
+    --line-subtle: #ececef;
+    --ink: #09090b;
+    --fg: #3f3f46;
+    --muted: #71717a;
+    --field: #fff;
+    --ok: #059669;
+    --ok-soft: #ecfdf5;
+    --err: #dc2626;
+    --err-soft: #fef2f2;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --glow: radial-gradient(60% 50% at 50% 0%, rgba(28, 110, 245, 0.16), transparent 70%);
+  }
+}
+:root[data-theme="light"] {
+  --canvas: #fff;
+  --elevated: #f6f7f9;
+  --glass: #f7f8fa;
+  --glass-subtle: #fafbfc;
+  --line: #e4e4e7;
+  --line-subtle: #ececef;
+  --ink: #09090b;
+  --fg: #3f3f46;
+  --muted: #71717a;
+  --field: #fff;
+  --ok: #059669;
+  --ok-soft: #ecfdf5;
+  --err: #dc2626;
+  --err-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --glow: radial-gradient(60% 50% at 50% 0%, rgba(28, 110, 245, 0.16), transparent 70%);
+}
+
+/* Expose tokens as utilities: bg-glass, text-ink, border-line, … */
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-canvas: var(--canvas);
+  --color-elevated: var(--elevated);
+  --color-glass: var(--glass);
+  --color-glass-subtle: var(--glass-subtle);
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+  --color-ink: var(--ink);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-field: var(--field);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-err: var(--err);
+  --color-err-soft: var(--err-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 24px;
+
+  /* Match the original layout: phone ≤520px, tablet/nav switch ≤820px. */
+  --breakpoint-sm: 521px;
+  --breakpoint-md: 821px;
+
+  --animate-view-in: view-in 0.18s ease-out;
+  --animate-shimmer: shimmer 1.2s infinite;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply min-h-screen bg-canvas font-sans text-[15px] text-fg antialiased;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-default;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Native <select> with a drawn chevron. */
+@utility select-chevron {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+@utility bg-glow {
+  background: var(--glow);
+}
