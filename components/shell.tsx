@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { useEffect, useState, type ReactNode } from "react";
 import { I, Logo } from "./icons";
@@ -12,7 +12,7 @@ import { initials } from "@/lib/format";
 import { loadFx } from "@/lib/fx";
 import { isExpired } from "@/lib/backend";
 import { onToast } from "@/lib/toast";
-import { safeRet, signInUrl, tradeParams, tradeUrl } from "@/lib/params";
+import { retParams, signInUrl, tradeParams, tradeUrl } from "@/lib/params";
 
 /** Routes that work signed out. */
 const PUBLIC = ["signin", "info", "rates"];
@@ -23,6 +23,7 @@ function useTop() {
   const [tab] = useQueryState("tab", tradeParams.tab);
   if (seg === "trade") return tab;
   if (!seg || seg === "rates") return "home";
+  if (seg === "recurring") return "activity";
   if (seg === "info") return "account";
   return seg;
 }
@@ -55,7 +56,7 @@ function Sidebar() {
       </Link>
       {nav("/", "home", "Home", I.home)}
       {nav("/activity", "activity", "Activity", I.activity)}
-      {nav("/recurring", "recurring", "Recurring", I.recurring)}
+      {nav("/bills", "bills", "Bills", I.bill)}
       {nav("/wallet", "wallet", "Wallet", I.wallet, alert && <span className="absolute right-3 size-[7px] rounded-full bg-err" title="Needs attention" />)}
       <div className="px-3 pt-[18px] pb-1.5 font-mono text-[11px] tracking-[.8px] text-muted uppercase max-lg:hidden">Move money</div>
       {nav(tradeUrl({ tab: "sell" }), "sell", "Sell USDT", I.sell)}
@@ -103,8 +104,8 @@ function BottomNav() {
       <Link className={bottomLink} href={tradeUrl({ tab: "sell" })} {...cur(move)}>
         {I.move}Move
       </Link>
-      <Link className={bottomLink} href="/recurring" {...cur(top === "recurring")}>
-        {I.recurring}Recurring
+      <Link className={bottomLink} href="/bills" {...cur(top === "bills")}>
+        {I.bill}Bills
       </Link>
       <Link className={bottomLink} href="/wallet" {...cur(top === "wallet")}>
         {I.wallet}Wallet
@@ -136,6 +137,8 @@ function View({ children }: { children: ReactNode }) {
 export function Frame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const search = useSearchParams().toString();
+  const [ret] = useQueryState("ret", retParams.ret);
   const { ready, db } = useApp();
   const seg = pathname.split("/")[1];
   const gate = ready && !db.user && !PUBLIC.includes(seg);
@@ -145,9 +148,9 @@ export function Frame({ children }: { children: ReactNode }) {
     loadFx();
   }, []);
   useEffect(() => {
-    if (gate) router.replace(signInUrl(pathname === "/" ? null : pathname + location.search));
-    if (signedInOnSignIn) router.replace(safeRet(new URLSearchParams(location.search).get("ret")));
-  }, [gate, signedInOnSignIn, pathname, router]);
+    if (gate) router.replace(signInUrl(pathname === "/" ? null : pathname + (search && "?" + search)));
+    if (signedInOnSignIn) router.replace(ret ?? "/");
+  }, [gate, signedInOnSignIn, pathname, search, ret, router]);
 
   if (!ready || gate || signedInOnSignIn) return null;
 

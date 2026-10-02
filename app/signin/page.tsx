@@ -11,7 +11,7 @@ import { EMAIL_RE, MOBILE_RE } from "@/lib/config";
 import type { SignInVia, User } from "@/lib/backend";
 import { commit, knownUser } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { infoUrl, retParams, safeRet } from "@/lib/params";
+import { infoUrl, retParams } from "@/lib/params";
 
 type Sso = "google" | "apple" | "binance";
 type Step = { step: "start"; via: "phone" | "email" } | { step: "otp" | "name"; via: "phone" | "email"; id: string } | { step: "sso"; sso: Sso };
@@ -35,7 +35,7 @@ export default function SignInPage() {
   const finish = (u: Omit<User, "providers" | "since">) => {
     commit((db) => void (db.user = { ...u, providers: [u.via], since: Date.now() }));
     toast("Signed in");
-    router.replace(safeRet(ret));
+    router.replace(ret ?? "/");
   };
 
   let body: ReactNode;

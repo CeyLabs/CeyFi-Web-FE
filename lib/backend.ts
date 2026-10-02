@@ -3,7 +3,7 @@
    (cards, bills), LankaClear JustPay (bank debits) and CeyPay Direct
    Debit + Offramp (exchanges → LKR). Replace these with API calls to go live.
    ===================================================================== */
-import { CFG, PNAME, bankShort, type Provider } from "./config";
+import { CFG, PNAME, bankShort, type Biller, type Provider } from "./config";
 import { mask, uid } from "./format";
 import { rate } from "./fx";
 
@@ -172,6 +172,16 @@ export function nextRun(x: Recurring) {
   return +n;
 }
 
+/* ---------- saved billers ---------- */
+
+export type SavedBiller = { id: string; code: string; account: string; created: number };
+
+export const billerCp = (b: Biller): Counterparty => ({ kind: "biller", code: b.code, name: b.name, key: b.code });
+
+/** Most recent successful payment to this biller account. */
+export const lastPaid = (db: DB, code: string, account: string) =>
+  db.tx.find((t) => t.kind === "bill" && t.cp.key === code && t.account === account && t.state === "completed");
+
 /* ---------- db ---------- */
 
 export type Waitlist = { email: string; at: number };
@@ -182,6 +192,7 @@ export type DB = {
   payees: Payee[];
   tx: Tx[];
   recurring: Recurring[];
+  billers: SavedBiller[];
   waitlist: Waitlist | null;
   defaultId: string | null;
   /** User renames of counterparties, by `Counterparty.key`. */
@@ -253,6 +264,33 @@ export function createTransfer(
     },
     _fail: payee.account_number.endsWith("0000"),
     _drop: simulateDrop,
+  });
+  return { tx };
+}
+
+/** Bill paid in USDT from an exchange account: collect USDT → convert → Pay&Go → biller. */
+export function createBillPayment(
+  db: DB,
+  { biller, account, lkr, method, q }: { biller: Biller; account: string; lkr: number; method: ExchangeMethod; q: Quote },
+): { error: string } | { tx: Tx } {
+  if (db.kyc !== "verified") return { error: "Verify your identity first" };
+  if (q.gross_usdt < CFG.min_usdt) return { error: `The minimum is ${CFG.min_usdt} USDT` };
+  if (daySpent(db) + q.gross_usdt > CFG.daily_limit_usdt) return { error: `This would exceed your daily limit of ${CFG.daily_limit_usdt} USDT` };
+  if (q.gross_usdt > method.per_txn_limit || spentBy(db, method.id, 30) + q.gross_usdt > method.monthly_limit)
+    return { error: "This is above the limits on this exchange account." };
+  if (quote(0, lkr).gross_usdt > q.gross_usdt * (1 + CFG.tol_pct / 100)) return { error: "The rate just moved. Please review the new amount." };
+  const tx = newTx(db, {
+    kind: "bill",
+    cp: billerCp(biller),
+    method_id: method.id,
+    state: "processing",
+    lkr,
+    fee_lkr: CFG.bill_fee,
+    account,
+    usdt: q.gross_usdt,
+    fees_usdt: q.fees_usdt,
+    rate: q.rate,
+    _fail: account.endsWith("0000"),
   });
   return { tx };
 }
@@ -358,6 +396,12 @@ export function seed(db: DB) {
   const r3: Recurring = { id: uid("rc_"), type: "remit", name: "Amma", cp: { kind: "person", name: "Amma", key: "p:" + amma.id }, plan: "Monthly · Family support", payee_id: amma.id, amount: 25000, freq: "monthly", day: 28, method_id: e1.id, purpose: "Family support", status: "active", created: now - 80 * D };
   const r4: Recurring = { id: uid("rc_"), type: "bill", name: "SLT Broadband", cp: { kind: "biller", code: "SLT", name: "SLT Broadband", key: "SLT" }, plan: "Monthly autopay", account: "0112345678", amount: null, cap: 8000, freq: "monthly", day: 5, method_id: c2.id, status: "canceled", created: now - 260 * D, canceled: now - 30 * D };
   db.recurring = [r1, r2, r3, r4];
+  db.billers = [
+    { id: uid("bl_"), code: "CEB", account: "1234567890", created: now - 100 * D },
+    { id: uid("bl_"), code: "SLT", account: "0112345678", created: now - 260 * D },
+    { id: uid("bl_"), code: "NWSDB", account: "10121234567", created: now - 92 * D },
+    { id: uid("bl_"), code: "DIALOG_PP", account: "0771234567", created: now - 20 * D },
+  ];
 
   const T = (days: number, o: Omit<Tx, "id" | "created" | "state"> & { state?: TxState }): Tx => ({ id: txId(o.kind), created: now - days * D, state: "completed", ...o });
   const sold = { kind: "sell", name: "Sold USDT", key: "sell" } as const;

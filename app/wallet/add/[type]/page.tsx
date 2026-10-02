@@ -9,7 +9,7 @@ import { cn } from "cn";
 import { BANKS, CFG, MOBILE_RE, PNAME, bankShort, type Provider } from "@/lib/config";
 import { lkr, sleep, uid } from "@/lib/format";
 import { brandOf, luhn, validExp, type CardMethod, type Method } from "@/lib/backend";
-import { addMethodUrl, retParams, safeRet } from "@/lib/params";
+import { addMethodUrl, retParams } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -22,7 +22,7 @@ function useDone(ret: string | null) {
       if (!db.defaultId || makeDefault) db.defaultId = m.id;
     });
     toast(msg);
-    router.push(ret ? safeRet(ret) : `/wallet/${m.id}`);
+    router.push(ret ?? `/wallet/${m.id}`);
   };
 }
 
@@ -44,7 +44,7 @@ type CardDraft = Omit<CardMethod, "id" | "type" | "created"> & { makeDefault: bo
 function AddCard({ ret }: { ret: string | null }) {
   const { db } = useApp();
   const done = useDone(ret);
-  const back = ret ? safeRet(ret) : addMethodUrl();
+  const back = ret ?? addMethodUrl();
   const [num, setNum] = useState("");
   const [holder, setHolder] = useState(db.user?.name || "");
   const [exp, setExp] = useState("");
@@ -191,7 +191,7 @@ function AddCard({ ret }: { ret: string | null }) {
 function AddJustPay({ ret }: { ret: string | null }) {
   const { db } = useApp();
   const done = useDone(ret);
-  const back = ret ? safeRet(ret) : addMethodUrl();
+  const back = ret ?? addMethodUrl();
   const [bankCode, setBankCode] = useState("");
   const [acct, setAcct] = useState("");
   const [mobile, setMobile] = useState(db.user?.phone || "");
@@ -304,7 +304,7 @@ function AddJustPay({ ret }: { ret: string | null }) {
 
 function AddExchange({ ret }: { ret: string | null }) {
   const done = useDone(ret);
-  const back = ret ? safeRet(ret) : addMethodUrl();
+  const back = ret ?? addMethodUrl();
   const [prov, setProv] = useState<Provider>("binance");
   const [label, setLabel] = useState("");
   const [per, setPer] = useState("500");

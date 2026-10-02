@@ -2,7 +2,6 @@
 
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search } from "lucide-react";
 import { cn } from "cn";
@@ -59,8 +58,11 @@ export const iconBtn =
 
 /* ---------- page frame ---------- */
 
-/** Sticky page header. The back button shows on phones only, where there's no sidebar. */
-export function PageHead({ title, right, back }: { title: ReactNode; right?: ReactNode; back?: string }) {
+/**
+ * Sticky page header. The back button shows on phones only, where there's no sidebar,
+ * unless `backAlways` is set (steps inside a flow, which the sidebar can't go back to).
+ */
+export function PageHead({ title, right, back, backAlways }: { title: ReactNode; right?: ReactNode; back?: string; backAlways?: boolean }) {
   const { db } = useApp();
   if (!db.user)
     return (
@@ -74,7 +76,7 @@ export function PageHead({ title, right, back }: { title: ReactNode; right?: Rea
   return (
     <header className="sticky top-0 z-[6] flex h-[60px] items-center gap-3 border-b border-line-subtle bg-canvas/90 px-4 backdrop-blur-md md:h-[76px] md:px-7">
       {back && (
-        <Link className={cn(iconBtn, "md:hidden")} href={back} aria-label="Back">
+        <Link className={cn(iconBtn, !backAlways && "md:hidden", backAlways && "md:-ml-2.5")} href={back} aria-label="Back">
           <ArrowLeft />
         </Link>
       )}
@@ -104,6 +106,45 @@ export function SearchBox({ value, onChange, label }: { value: string; onChange:
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
+  );
+}
+
+/** Segmented switch of plain links, so tabs work with middle-click and history. */
+export function Segmented({ items, className }: { items: { href: string; label: ReactNode; on: boolean; replace?: boolean }[]; className?: string }) {
+  return (
+    <div className={cn("mb-3 grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl border border-line bg-field p-[3px]", className)} role="tablist">
+      {items.map((t) => (
+        <Link
+          key={t.href}
+          href={t.href}
+          replace={t.replace}
+          aria-current={t.on ? "page" : undefined}
+          className={cn("flex items-center justify-center gap-1.5 rounded-[9px] p-2 text-center text-sm font-medium text-muted", t.on && "bg-brand text-white")}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/** Bottom sheet on phones, centred dialog on wider screens. Escape or a tap outside closes it. */
+export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
+  useEffect(() => {
+    if (!open) return;
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    addEventListener("keydown", k);
+    return () => removeEventListener("keydown", k);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center md:p-6" role="dialog" aria-modal="true" aria-label={label}>
+      <button className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-label="Close" onClick={onClose} />
+      <div className="relative w-full max-w-[460px] animate-view-in rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] md:rounded-[22px] md:pb-[18px]">
+        <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-line md:hidden" />
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -356,6 +397,17 @@ const BILLER_COLORS: Record<string, [string, string]> = {
   Hutch: ["#ff6a13", "#fff"],
   Airtel: ["#e40000", "#fff"],
   AIA: ["#d31145", "#fff"],
+  MOBITEL_PP: ["#009a44", "#fff"],
+  HUTCH_PP: ["#ff6a13", "#fff"],
+  AIRTEL_PP: ["#e40000", "#fff"],
+  DIALOG_BB: ["#ec1c24", "#fff"],
+  PEOTV: ["#5b2a86", "#fff"],
+  LITRO: ["#0a8f3c", "#fff"],
+  LAUGFS: ["#f37021", "#fff"],
+  SLIC: ["#00529b", "#fff"],
+  CEYLINCO: ["#c8102e", "#fff"],
+  CMC: ["#7a1f2b", "#fff"],
+  KMC: ["#1f5f3a", "#fff"],
 };
 
 /** Counterparty logo: generated initials for people, brand colours for billers. */
@@ -523,7 +575,11 @@ export function LRow({
   className?: string;
 }) {
   const cls = cn(
-    "grid w-full items-center gap-3.5 rounded-xl px-2.5 py-[11px] text-left text-[15px] text-fg hover:bg-glass-subtle md:px-4 [&+&]:shadow-[0_-1px_0_var(--line-subtle)]",
+    "grid w-full items-center gap-3.5 rounded-xl px-2.5 py-[11px] text-left text-[15px] text-fg hover:bg-glass-subtle md:px-4 relative",
+    // Inset divider between rows, hidden next to a hovered or selected row so it doesn't cut its rounded background.
+    // Always absolute: an in-flow ::before would become a grid cell and shift the row's columns.
+    "before:absolute before:inset-x-2.5 before:top-0 before:h-px md:before:inset-x-4 [&+&]:before:bg-line-subtle",
+    "hover:before:opacity-0 [&:hover+&]:before:opacity-0 aria-[current=true]:before:opacity-0 [&[aria-current=true]+&]:before:opacity-0",
     LROW_COLS[variant],
     selected && "bg-glass shadow-[inset_0_0_0_1px_var(--line)]! hover:bg-glass",
     className,
@@ -751,11 +807,4 @@ export function useNow(ms: number) {
     return () => clearInterval(id);
   }, [ms]);
   return now;
-}
-
-/** Back target from `?ret=`, falling back to `fallback`. */
-export function useBack(ret: string | null, fallback: string) {
-  const router = useRouter();
-  const to = ret && ret.startsWith("/") && !ret.startsWith("//") ? ret : fallback;
-  return { to, go: () => router.push(to) };
 }

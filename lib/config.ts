@@ -43,16 +43,41 @@ export const bankShort = (n: string) =>
     .replace("Nations Trust", "NTB")
     .replace("National Savings", "NSB");
 
-export type Biller = { code: string; name: string; cat: string; varies: boolean };
+export type BillCat = "electricity" | "water" | "mobile" | "internet" | "tv" | "gas" | "insurance" | "rates";
+/** Bill categories in display order. `short` fits the home grid. */
+export const BILL_CATS: Record<BillCat, { label: string; short: string }> = {
+  electricity: { label: "Electricity", short: "Electricity" },
+  water: { label: "Water", short: "Water" },
+  mobile: { label: "Mobile postpaid", short: "Mobile" },
+  internet: { label: "Internet", short: "Internet" },
+  tv: { label: "Television", short: "TV" },
+  gas: { label: "Gas (LPG)", short: "Gas" },
+  insurance: { label: "Insurance", short: "Insurance" },
+  rates: { label: "Assessment tax", short: "Rates" },
+};
+
+export type Biller = { code: string; name: string; cat: BillCat; varies: boolean };
 export const BILLERS: Biller[] = [
-  { code: "CEB", name: "Ceylon Electricity Board", cat: "Electricity", varies: true },
-  { code: "LECO", name: "LECO", cat: "Electricity", varies: true },
-  { code: "NWSDB", name: "National Water Supply", cat: "Water", varies: true },
-  { code: "SLT", name: "SLT Broadband", cat: "Internet", varies: true },
-  { code: "DIALOG_PP", name: "Dialog Postpaid", cat: "Mobile", varies: true },
-  { code: "DIALOGTV", name: "Dialog TV", cat: "TV", varies: false },
-  { code: "AIA", name: "AIA Insurance", cat: "Insurance", varies: false },
+  { code: "CEB", name: "Ceylon Electricity Board", cat: "electricity", varies: true },
+  { code: "LECO", name: "LECO", cat: "electricity", varies: true },
+  { code: "NWSDB", name: "National Water Supply", cat: "water", varies: true },
+  { code: "DIALOG_PP", name: "Dialog Postpaid", cat: "mobile", varies: true },
+  { code: "MOBITEL_PP", name: "Mobitel Postpaid", cat: "mobile", varies: true },
+  { code: "AIRTEL_PP", name: "Airtel Postpaid", cat: "mobile", varies: true },
+  { code: "HUTCH_PP", name: "Hutch Postpaid", cat: "mobile", varies: true },
+  { code: "SLT", name: "SLT Broadband", cat: "internet", varies: true },
+  { code: "DIALOG_BB", name: "Dialog Home Broadband", cat: "internet", varies: true },
+  { code: "DIALOGTV", name: "Dialog TV", cat: "tv", varies: false },
+  { code: "PEOTV", name: "PEOTV", cat: "tv", varies: false },
+  { code: "LITRO", name: "Litro Gas", cat: "gas", varies: true },
+  { code: "LAUGFS", name: "Laugfs Gas", cat: "gas", varies: true },
+  { code: "AIA", name: "AIA Insurance", cat: "insurance", varies: false },
+  { code: "SLIC", name: "Sri Lanka Insurance", cat: "insurance", varies: false },
+  { code: "CEYLINCO", name: "Ceylinco Life", cat: "insurance", varies: false },
+  { code: "CMC", name: "Colombo Municipal Council", cat: "rates", varies: true },
+  { code: "KMC", name: "Kandy Municipal Council", cat: "rates", varies: true },
 ];
+export const billerBy = (code: string | null | undefined) => BILLERS.find((b) => b.code === code);
 
 /** Mobile prefix → operator, for reloads. */
 export const OPS: Record<string, string> = {

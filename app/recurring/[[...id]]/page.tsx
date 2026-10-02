@@ -3,6 +3,7 @@
 import { CirclePause, CirclePlay, CircleX, FileText, Headset, Plus, Zap } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useRef } from "react";
+import { ActivityTabs } from "@/components/activity";
 import { Alert, Button, ButtonLink, CpLogo, DAct, DCard, DGroup, DRow, DetailHead, Empty, LRow, ListGroup, MasterDetail, PageHead, Stat, useArmed } from "@/components/ui";
 import { cn } from "cn";
 import { CFG } from "@/lib/config";
@@ -41,7 +42,7 @@ export default function RecurringPage() {
   return (
     <>
       <PageHead
-        title="Recurring"
+        title="Activity"
         back={id ? "/recurring" : undefined}
         right={
           <ButtonLink href="/recurring/new">
@@ -53,7 +54,9 @@ export default function RecurringPage() {
         selected={!!x}
         placeholder="Select a recurring payment to see the details"
         list={
-          db.recurring.length ? (
+          <>
+          <ActivityTabs on="recurring" />
+          {db.recurring.length ? (
             <>
               <ListGroup>Active</ListGroup>
               {active.length ? active.map(row) : <div className="px-4 py-2 text-[12.5px] text-muted">None</div>}
@@ -72,7 +75,8 @@ export default function RecurringPage() {
                 Set up recurring
               </ButtonLink>
             </Empty>
-          )
+          )}
+          </>
         }
         detail={x && <RecDetail key={x.id} x={x} />}
       />

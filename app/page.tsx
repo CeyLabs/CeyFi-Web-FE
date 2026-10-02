@@ -11,7 +11,7 @@ import { fxDate, rate, useFx } from "@/lib/fx";
 import { M, isExpired, mName, nextRun, seed } from "@/lib/backend";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { accountUrl, addMethodUrl, recNewUrl, tradeUrl } from "@/lib/params";
+import { accountUrl, addMethodUrl, tradeUrl } from "@/lib/params";
 
 const quick = "flex flex-col gap-2.5 rounded-[18px] border border-line bg-glass-subtle px-3.5 py-4 hover:border-brand";
 const quickIcon = "grid size-[38px] place-items-center rounded-xl bg-brand-soft text-brand [&_svg]:size-5";
@@ -81,10 +81,10 @@ export default function Home() {
             <b className="font-medium text-ink">Send money</b>
             <small className="text-[12.5px] text-muted">To any bank</small>
           </Link>
-          <Link className={quick} href={recNewUrl("bill")}>
+          <Link className={quick} href="/bills">
             <span className={quickIcon}>{I.bill}</span>
             <b className="font-medium text-ink">Pay bills</b>
-            <small className="text-[12.5px] text-muted">Set up autopay</small>
+            <small className="text-[12.5px] text-muted">With your USDT</small>
           </Link>
           <Link className={quick} href={tradeUrl({ tab: "buy" })}>
             <span className={quickIcon}>{I.buy}</span>

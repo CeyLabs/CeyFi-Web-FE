@@ -7,7 +7,6 @@ import { cn } from "cn";
 import { BANKS, CFG, MOBILE_RE } from "@/lib/config";
 import { sleep, uid } from "@/lib/format";
 import type { Payee } from "@/lib/backend";
-import { safeRet } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -16,7 +15,7 @@ type FlowProps = { ret: string | null };
 export function Verify({ ret }: FlowProps) {
   const router = useRouter();
   const { db } = useApp();
-  const back = safeRet(ret);
+  const back = ret ?? "/";
   const [agreed, setAgreed] = useState(false);
   const [running, setRunning] = useState(false);
 
@@ -81,7 +80,7 @@ export function Verify({ ret }: FlowProps) {
 
 export function AddPayee({ ret, self }: FlowProps & { self: boolean }) {
   const router = useRouter();
-  const back = safeRet(ret, "/account");
+  const back = ret ?? "/account";
   const { db } = useApp();
   const [bankCode, setBankCode] = useState("");
   const [acct, setAcct] = useState("");

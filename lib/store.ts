@@ -31,9 +31,9 @@ export type Draft = {
   q: Quote | null;
 };
 
-const DB_KEYS = ["user", "kyc", "methods", "payees", "tx", "recurring", "waitlist", "defaultId", "names"] as const;
+const DB_KEYS = ["user", "kyc", "methods", "payees", "tx", "recurring", "billers", "waitlist", "defaultId", "names"] as const;
 
-const emptyDb = (): DB => ({ user: null, kyc: "not_started", methods: [], payees: [], tx: [], recurring: [], waitlist: null, defaultId: null, names: {} });
+const emptyDb = (): DB => ({ user: null, kyc: "not_started", methods: [], payees: [], tx: [], recurring: [], billers: [], waitlist: null, defaultId: null, names: {} });
 const emptyDraft = (): Draft => ({ incur: "USDT", amount: "", payee: { sell: null, send: null }, account: null, q: null });
 
 const state = { version: -1, db: emptyDb(), draft: emptyDraft() };

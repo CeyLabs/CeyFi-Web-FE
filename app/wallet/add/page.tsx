@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useQueryState } from "nuqs";
 import { Kv, PageHead, Pad, Panel, Pmi, col, tile } from "@/components/ui";
-import { addMethodUrl, retParams, safeRet } from "@/lib/params";
+import { addMethodUrl, retParams } from "@/lib/params";
 
 export default function AddMethodPage() {
   const [ret] = useQueryState("ret", retParams.ret);
   return (
     <>
-      <PageHead title="Add payment method" back={safeRet(ret, "/wallet")} />
+      <PageHead title="Add payment method" back={ret ?? "/wallet"} />
       <Pad>
         <div className={col}>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">

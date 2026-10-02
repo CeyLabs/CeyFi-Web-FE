@@ -2,13 +2,40 @@
 
 import { CalendarCheck, FileText, LifeBuoy, Share } from "lucide-react";
 import { useEffect } from "react";
-import { Alert, Button, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Stat, StepDot, fine } from "./ui";
+import { Alert, Button, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Stat, StepDot, fine } from "./ui";
 import { cn } from "cn";
 import { fmt, dLong, dShort, dTime, lkr } from "@/lib/format";
 import { M, advance, isLive, mName, stLabel, txTitle, type DB, type Tx } from "@/lib/backend";
-import { activityUrl, infoUrl } from "@/lib/params";
+import { activityTxUrl, activityUrl, infoUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+
+/** History / Recurring switch shared by both Activity screens. */
+export function ActivityTabs({ on }: { on: "history" | "recurring" }) {
+  return (
+    <Segmented
+      className="mx-2.5 mt-3 mb-1 md:mx-4 md:max-w-[340px]"
+      items={[
+        { href: "/activity", label: "History", on: on === "history" },
+        { href: "/recurring", label: "Recurring", on: on === "recurring" },
+      ]}
+    />
+  );
+}
+
+/** Moves a live transaction along while it's on screen. */
+export function useAdvance(t: Tx | undefined) {
+  const live = !!t && isLive(t.state);
+  useEffect(() => {
+    if (!t || !live) return;
+    const iv = setInterval(() => {
+      const prev = t.state;
+      advance(t);
+      if (t.state !== prev) commit();
+    }, 600);
+    return () => clearInterval(iv);
+  }, [t, live]);
+}
 
 const amountOf = (t: Tx) => (t.lkr ? lkr(t.lkr) : t.quoted_lkr ? lkr(t.quoted_lkr) : "—");
 
@@ -18,7 +45,7 @@ export function TxRow({ db, t, selected, compact, q }: { db: DB; t: Tx; selected
   return (
     <LRow
       variant={compact ? "w3" : "full"}
-      href={`/activity/${t.id}${q ? "?q=" + encodeURIComponent(q) : ""}`}
+      href={activityTxUrl(t.id, q)}
       selected={selected}
       logo={<CpLogo cp={t.cp} />}
       title={txTitle(db, t)}
@@ -84,16 +111,7 @@ export function TxDetail({ t }: { t: Tx }) {
   const fx = t.kind === "sell" || t.kind === "remit";
   const rec = t.recurring_id ? db.recurring.find((r) => r.id === t.recurring_id) : undefined;
   const live = isLive(t.state);
-
-  useEffect(() => {
-    if (!live) return;
-    const iv = setInterval(() => {
-      const prev = t.state;
-      advance(t);
-      if (t.state !== prev) commit();
-    }, 600);
-    return () => clearInterval(iv);
-  }, [t, live]);
+  useAdvance(t);
 
   const rename = () => {
     const n = prompt("Rename this", title);
@@ -179,6 +197,21 @@ export function TxDetail({ t }: { t: Tx }) {
           </>
         ) : (
           <>
+            {t.usdt ? (
+              <>
+                <DRow label="Paid in USDT">
+                  <span className="font-mono">{fmt(t.usdt)} USDT</span>
+                </DRow>
+                <DRow label="Conversion fee">
+                  <span className="font-mono">{fmt(t.fees_usdt)} USDT</span>
+                </DRow>
+                {t.rate ? (
+                  <DRow label="Rate">
+                    <span className="font-mono">1 USDT = LKR {fmt(t.rate)}</span>
+                  </DRow>
+                ) : null}
+              </>
+            ) : null}
             <DRow label="Subtotal">
               <span className="font-mono">{lkr(t.lkr)}</span>
             </DRow>
