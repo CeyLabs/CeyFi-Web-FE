@@ -71,6 +71,16 @@ export const knownUser = {
   set: (id: string, u: Omit<User, "providers" | "since">) => ls.set("known_" + id, u),
 };
 
+/** True once a user has signed in. Readable outside React, e.g. in event handlers. */
+export const signedIn = () => (load(), !!state.db.user);
+
+/** Sign out and clear that user's data, so a signed-out visitor never sees it. Returning users stay known. */
+export function signOut() {
+  state.db = emptyDb();
+  state.draft = emptyDraft();
+  commit();
+}
+
 /** Wipe all demo data. */
 export function resetAll() {
   try {

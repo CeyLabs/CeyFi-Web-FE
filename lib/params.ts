@@ -69,7 +69,6 @@ export const billsUrl = (p: Values<inferParserType<typeof billsParams>> = {}) =>
 
 export const retParams = { ret: parseAsReturnPath };
 const retSer = createSerializer(retParams);
-export const signInUrl = (ret?: string | null) => retSer("/signin", { ret: ret || null });
 export const addMethodUrl = (type?: "card" | "justpay" | "exchange", ret?: string | null) =>
   retSer(type ? `/wallet/add/${type}` : "/wallet/add", { ret: ret || null });
 

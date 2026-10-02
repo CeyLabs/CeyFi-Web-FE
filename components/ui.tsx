@@ -9,7 +9,8 @@ import { CFG, PNAME } from "@/lib/config";
 import { fmt, hue, initials, phone } from "@/lib/format";
 import { fxDate, useFx } from "@/lib/fx";
 import { isExpired, spentBy, type Counterparty, type DB, type Method } from "@/lib/backend";
-import { infoUrl, signInUrl } from "@/lib/params";
+import { infoUrl } from "@/lib/params";
+import { openSignIn } from "@/lib/auth";
 import { useApp } from "@/lib/store";
 
 /* ---------- shared class strings ---------- */
@@ -64,15 +65,6 @@ export const iconBtn =
  */
 export function PageHead({ title, right, back, backAlways }: { title: ReactNode; right?: ReactNode; back?: string; backAlways?: boolean }) {
   const { db } = useApp();
-  if (!db.user)
-    return (
-      <div className="mb-3">
-        <ButtonLink variant="ghost" size="sm" href={signInUrl()} className="mb-3.5">
-          ← Sign in
-        </ButtonLink>
-        <h1 className="m-0 text-[28px] font-medium text-ink">{title}</h1>
-      </div>
-    );
   return (
     <header className="sticky top-0 z-[6] flex h-[60px] items-center gap-3 border-b border-line-subtle bg-canvas/90 px-4 backdrop-blur-md md:h-[76px] md:px-7">
       {back && (
@@ -83,14 +75,18 @@ export function PageHead({ title, right, back, backAlways }: { title: ReactNode;
       <h1 className="m-0 flex-none text-xl font-medium tracking-[-.5px] text-ink md:text-2xl">{title}</h1>
       <div className="flex-1" />
       {right}
+      {/* Phones have no sidebar, so signing in starts here. */}
+      {!db.user && (
+        <Button size="sm" className="md:hidden" onClick={() => openSignIn()}>
+          Sign in
+        </Button>
+      )}
     </header>
   );
 }
 
 /** Padded page body below a PageHead. */
 export function Pad({ children, className }: { children: ReactNode; className?: string }) {
-  const { db } = useApp();
-  if (!db.user) return <>{children}</>;
   return <div className={cn("px-4 pt-4 pb-10 md:px-7 md:pt-6 md:pb-[60px]", className)}>{children}</div>;
 }
 

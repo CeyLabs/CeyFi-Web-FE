@@ -36,6 +36,7 @@ import { M, billerCp, createBillPayment, daySpent, eligible, isLive, lastPaid, m
 import { accountUrl, addMethodUrl, billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+import { withAuth } from "@/lib/auth";
 
 const toNum = (amt: string) => Number(amt.replace(/,/g, "")) || 0;
 const QUICK = [2500, 5000, 10000];
@@ -112,11 +113,12 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
     dis = true;
   } else label = `Pay ${lkr(a)}`;
 
-  const go = () => {
-    if (href) return router.push(href);
-    setErr("");
-    setReview(true);
-  };
+  const go = () =>
+    withAuth(() => {
+      if (href) return router.push(href);
+      setErr("");
+      setReview(true);
+    });
 
   const confirm = async () => {
     if (busy || !q || !m) return;

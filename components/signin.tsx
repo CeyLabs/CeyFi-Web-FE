@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useQueryState } from "nuqs";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Logo } from "@/components/icons";
-import { Button, Field, Panel, Pmi, fine, inputCls, useErrors } from "@/components/ui";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, Empty, Field, PageHead, Pad, Panel, Pmi, Sheet, col, fine, inputCls, useErrors } from "@/components/ui";
 import { cn } from "cn";
 import { EMAIL_RE, MOBILE_RE } from "@/lib/config";
 import type { SignInVia, User } from "@/lib/backend";
-import { commit, knownUser } from "@/lib/store";
+import { commit, knownUser, useApp } from "@/lib/store";
+import { onSignIn, openSignIn } from "@/lib/auth";
 import { toast } from "@/lib/toast";
-import { infoUrl, retParams } from "@/lib/params";
+import { infoUrl } from "@/lib/params";
 
 type Sso = "google" | "apple" | "binance";
 type Step = { step: "start"; via: "phone" | "email" } | { step: "otp" | "name"; via: "phone" | "email"; id: string } | { step: "sso"; sso: Sso };
@@ -27,15 +25,32 @@ const ssoMark = "grid size-5 place-items-center rounded-full text-[11px] font-bo
 const seg = "grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl border border-line bg-field p-[3px]";
 const segBtn = "rounded-[9px] p-2 text-sm font-medium text-muted";
 
-export default function SignInPage() {
-  const router = useRouter();
-  const [ret] = useQueryState("ret", retParams.ret);
+/** Sign-in dialog, mounted once in the root layout and opened with `openSignIn()`. */
+export function SignInDialog() {
+  const [open, setOpen] = useState(false);
   const [s, setS] = useState<Step>({ step: "start", via: "phone" });
+  const then = useRef<(() => void) | null>(null);
+
+  useEffect(
+    () =>
+      onSignIn((fn) => {
+        then.current = fn;
+        setS({ step: "start", via: "phone" });
+        setOpen(true);
+      }),
+    [],
+  );
+  const close = useCallback(() => {
+    then.current = null;
+    setOpen(false);
+  }, []);
 
   const finish = (u: Omit<User, "providers" | "since">) => {
     commit((db) => void (db.user = { ...u, providers: [u.via], since: Date.now() }));
     toast("Signed in");
-    router.replace(ret ?? "/");
+    const fn = then.current;
+    close();
+    fn?.();
   };
 
   let body: ReactNode;
@@ -67,28 +82,46 @@ export default function SignInPage() {
     );
 
   return (
-    <div className="relative grid min-h-screen place-items-center p-6">
-      <div className="pointer-events-none fixed inset-0 bg-glow" />
-      <div className="relative w-full max-w-[420px]">
-        <div className="mb-[22px] flex justify-center text-ink [&_svg]:h-[30px] [&_svg]:w-auto">
-          <Logo />
-        </div>
-        <Panel className="p-6">{body}</Panel>
+    <Sheet open={open} onClose={close} label="Sign in">
+      <div className="max-h-[calc(100dvh-80px)] overflow-y-auto px-1.5 pt-1.5">
+        {body}
         <p className={cn(fine, "mt-3.5 text-center")}>
           By continuing you agree to CeyPay’s Terms of use and Privacy notice. Production sign-in is handled by Clerk.
         </p>
         <p className={cn(fine, "text-center")}>
-          <Link href={infoUrl("safety")} className="text-fg">
+          <Link href={infoUrl("safety")} className="text-fg" onClick={close}>
             Safety
           </Link>{" "}
           ·{" "}
-          <Link href="/rates" className="text-fg">
+          <Link href="/rates" className="text-fg" onClick={close}>
             Today’s rates
-          </Link>{" "}
-          · <span className="rounded-full bg-warn-soft px-[7px] py-[3px] font-mono text-[10px] tracking-[.5px] text-warn">DEMO</span>
+          </Link>
         </p>
       </div>
-    </div>
+    </Sheet>
+  );
+}
+
+/** Stands in for a screen that needs an account, and opens the dialog on arrival. */
+export function RequireAuth({ title, children }: { title: string; children: ReactNode }) {
+  const { db } = useApp();
+  const user = !!db.user;
+  useEffect(() => {
+    if (!user) openSignIn();
+  }, [user]);
+  if (user) return <>{children}</>;
+  return (
+    <>
+      <PageHead title={title} />
+      <Pad>
+        <Panel className={cn(col, "text-center")}>
+          <Empty title="Sign in to continue">You need a CeyPay account for this. It takes seconds.</Empty>
+          <Button className="mx-auto mb-2 flex" onClick={() => openSignIn()}>
+            Sign in
+          </Button>
+        </Panel>
+      </Pad>
+    </>
   );
 }
 

@@ -11,6 +11,7 @@ import { fxDate, rate, useFx } from "@/lib/fx";
 import { M, isExpired, mName, nextRun, seed } from "@/lib/backend";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+import { withAuth } from "@/lib/auth";
 import { accountUrl, addMethodUrl, tradeUrl } from "@/lib/params";
 
 const quick = "flex flex-col gap-2.5 rounded-[18px] border border-line bg-glass-subtle px-3.5 py-4 hover:border-brand";
@@ -19,7 +20,7 @@ const quickIcon = "grid size-[38px] place-items-center rounded-xl bg-brand-soft 
 export default function Home() {
   const { db } = useApp();
   const fx = useFx();
-  const u = db.user!,
+  const u = db.user,
     r = rate();
   const pts = fx.hist,
     L = pts.length - 1;
@@ -54,7 +55,7 @@ export default function Home() {
         }
       />
       <Pad>
-        <div className="text-[28px] font-medium tracking-[-.8px] text-ink">Hi {u.name.split(" ")[0]}</div>
+        <div className="text-[28px] font-medium tracking-[-.8px] text-ink">{u ? `Hi ${u.name.split(" ")[0]}` : "Welcome to CeyPay"}</div>
         <p className="mt-1 mb-[18px] text-muted">What would you like to do today?</p>
         {expired.map((m) => (
           <Alert
@@ -102,10 +103,12 @@ export default function Home() {
               <div className={fine}>Fills your wallet, activity and recurring payments so you can see how it all works. You can reset it any time.</div>
             </div>
             <Button
-              onClick={() => {
-                commit((db) => seed(db));
-                toast("Sample data loaded");
-              }}
+              onClick={() =>
+                withAuth(() => {
+                  commit((db) => seed(db));
+                  toast("Sample data loaded");
+                })
+              }
             >
               Load sample data
             </Button>

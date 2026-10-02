@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { useEffect, useState, type ReactNode } from "react";
+import { LogIn } from "lucide-react";
 import { I, Logo } from "./icons";
 import { Soon } from "./ui";
 import { cn } from "cn";
@@ -12,10 +13,8 @@ import { initials } from "@/lib/format";
 import { loadFx } from "@/lib/fx";
 import { isExpired } from "@/lib/backend";
 import { onToast } from "@/lib/toast";
-import { retParams, signInUrl, tradeParams, tradeUrl } from "@/lib/params";
-
-/** Routes that work signed out. */
-const PUBLIC = ["signin", "info", "rates"];
+import { openSignIn } from "@/lib/auth";
+import { tradeParams, tradeUrl } from "@/lib/params";
 
 /** Which nav item is active: trade screens map to their tab, sub-routes to their parent. */
 function useTop() {
@@ -37,7 +36,7 @@ const label = "max-lg:hidden";
 function Sidebar() {
   const top = useTop();
   const { db } = useApp();
-  const u = db.user!;
+  const u = db.user;
   const alert = db.methods.some(isExpired);
   const nav = (href: string, key: string, text: ReactNode, icon: ReactNode, extra?: ReactNode) => (
     <Link className={sideLink} href={href} {...cur(top === key)}>
@@ -70,17 +69,26 @@ function Sidebar() {
         I.buy,
       )}
       <div className="flex-1" />
-      <Link
-        href="/account"
-        className="mt-2.5 flex w-full items-center gap-3 border-t border-line-subtle px-2.5 pt-3.5 pb-1 text-left max-lg:justify-center max-lg:px-0 max-lg:pt-3"
-        {...cur(top === "account")}
-      >
-        <span className="grid size-10 flex-none place-items-center rounded-full bg-brand font-semibold text-white">{initials(u.name)}</span>
-        <div className="min-w-0 max-lg:hidden">
-          <b className="block text-[14.5px] font-medium text-ink">Hello {u.name.split(" ")[0]}</b>
-          <small className="block max-w-[160px] truncate text-[12.5px] text-muted">{u.email || u.phone}</small>
+      {u ? (
+        <Link
+          href="/account"
+          className="mt-2.5 flex w-full items-center gap-3 border-t border-line-subtle px-2.5 pt-3.5 pb-1 text-left max-lg:justify-center max-lg:px-0 max-lg:pt-3"
+          {...cur(top === "account")}
+        >
+          <span className="grid size-10 flex-none place-items-center rounded-full bg-brand font-semibold text-white">{initials(u.name)}</span>
+          <div className="min-w-0 max-lg:hidden">
+            <b className="block text-[14.5px] font-medium text-ink">Hello {u.name.split(" ")[0]}</b>
+            <small className="block max-w-[160px] truncate text-[12.5px] text-muted">{u.email || u.phone}</small>
+          </div>
+        </Link>
+      ) : (
+        <div className="mt-2.5 border-t border-line-subtle pt-3.5">
+          <button className={cn(sideLink, "w-full")} onClick={() => openSignIn()} aria-label="Sign in">
+            <LogIn />
+            <span className={label}>Sign in</span>
+          </button>
         </div>
-      </Link>
+      )}
     </aside>
   );
 }
@@ -130,40 +138,15 @@ function View({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * App frame. Waits for localStorage state, sends signed-out visitors to sign-in,
- * and wraps signed-in screens in the sidebar shell.
- */
+/** App frame. Waits for localStorage state, then wraps every screen in the sidebar shell, signed in or not. */
 export function Frame({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const search = useSearchParams().toString();
-  const [ret] = useQueryState("ret", retParams.ret);
-  const { ready, db } = useApp();
-  const seg = pathname.split("/")[1];
-  const gate = ready && !db.user && !PUBLIC.includes(seg);
-  const signedInOnSignIn = ready && !!db.user && seg === "signin";
+  const { ready } = useApp();
 
   useEffect(() => {
     loadFx();
   }, []);
-  useEffect(() => {
-    if (gate) router.replace(signInUrl(pathname === "/" ? null : pathname + (search && "?" + search)));
-    if (signedInOnSignIn) router.replace(ret ?? "/");
-  }, [gate, signedInOnSignIn, pathname, search, ret, router]);
 
-  if (!ready || gate || signedInOnSignIn) return null;
-
-  if (seg === "signin") return <>{children}</>;
-
-  // Public pages viewed signed out.
-  if (!db.user)
-    return (
-      <div className="relative grid min-h-screen place-items-start justify-center px-6 py-6">
-        <div className="pointer-events-none fixed inset-0 bg-glow" />
-        <div className="relative w-full max-w-[640px]">{children}</div>
-      </div>
-    );
+  if (!ready) return null;
 
   return (
     <>

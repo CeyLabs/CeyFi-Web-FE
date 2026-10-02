@@ -1,14 +1,16 @@
 "use client";
 
-import { LogOut, Plus } from "lucide-react";
+import { LogIn, LogOut, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQueryStates } from "nuqs";
 import { Button, ButtonLink, ConfirmButton, CpLogo, Empty, Kv, LRow, Legal, ListPanel, NavKv, PageHead, Pad, Panel, SectionTitle, Stat, TitleLink, TwoCol, col } from "@/components/ui";
 import { AddPayee, Verify } from "@/components/account/flows";
+import { RequireAuth } from "@/components/signin";
+import { openSignIn } from "@/lib/auth";
 import { CFG, bankShort } from "@/lib/config";
 import { fmt, initials, mask } from "@/lib/format";
 import { daySpent, type SignInVia } from "@/lib/backend";
-import { commit, resetAll, useApp } from "@/lib/store";
+import { commit, resetAll, signOut, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { accountParams, accountUrl, infoUrl } from "@/lib/params";
 
@@ -23,7 +25,8 @@ const PROVIDERS: [SignInVia, string][] = [
 function Overview() {
   const router = useRouter();
   const { db } = useApp();
-  const u = db.user!;
+  const u = db.user;
+  if (!u) return <SignedOut />;
 
   return (
     <>
@@ -119,21 +122,16 @@ function Overview() {
             )}
           </ListPanel>
 
-          <SectionTitle>Help</SectionTitle>
-          <Panel className="py-1">
-            <NavKv href="/rates" label="Exchange rates" />
-            <NavKv href={infoUrl("safety")} label="Safety & compliance" />
-            <NavKv href={infoUrl("fees")} label="Fees & limits" />
-            <NavKv href={infoUrl("faq")} label="Help & complaints" />
-          </Panel>
+          <Help />
 
           <TwoCol className="mt-4">
             <Button
               variant="ghost"
               size="lg"
               onClick={() => {
-                commit((db) => void (db.user = null));
-                router.push("/signin");
+                signOut();
+                toast("Signed out");
+                router.push("/");
               }}
             >
               <LogOut /> Sign out
@@ -145,7 +143,7 @@ function Overview() {
               armedLabel="Tap again"
               onConfirm={() => {
                 resetAll();
-                router.push("/signin");
+                router.push("/");
               }}
             />
           </TwoCol>
@@ -156,10 +154,53 @@ function Overview() {
   );
 }
 
+const Help = () => (
+  <>
+    <SectionTitle>Help</SectionTitle>
+    <Panel className="py-1">
+      <NavKv href="/rates" label="Exchange rates" />
+      <NavKv href={infoUrl("safety")} label="Safety & compliance" />
+      <NavKv href={infoUrl("fees")} label="Fees & limits" />
+      <NavKv href={infoUrl("faq")} label="Help & complaints" />
+    </Panel>
+  </>
+);
+
+function SignedOut() {
+  return (
+    <>
+      <PageHead title="Account" />
+      <Pad>
+        <div className={col}>
+          <Panel>
+            <b className="text-[17px] font-medium text-ink">You’re not signed in</b>
+            <p className="mt-1 mb-3.5 text-[13.5px] text-muted">Sign in or create an account to sell, send, pay bills and manage your wallet.</p>
+            <Button size="lg" onClick={() => openSignIn()}>
+              <LogIn /> Sign in
+            </Button>
+          </Panel>
+          <Help />
+          <Legal />
+        </div>
+      </Pad>
+    </>
+  );
+}
+
 /** Account overview, or a setup flow via `?flow=verify|payee&ret=…`. */
 export default function AccountPage() {
   const [{ flow, ret, self }] = useQueryStates(accountParams);
-  if (flow === "verify") return <Verify ret={ret} />;
-  if (flow === "payee") return <AddPayee ret={ret} self={self} />;
+  if (flow === "verify")
+    return (
+      <RequireAuth title="Verify your identity">
+        <Verify ret={ret} />
+      </RequireAuth>
+    );
+  if (flow === "payee")
+    return (
+      <RequireAuth title="Add bank account">
+        <AddPayee ret={ret} self={self} />
+      </RequireAuth>
+    );
   return <Overview />;
 }

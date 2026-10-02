@@ -15,6 +15,7 @@ import { billerCp } from "@/lib/backend";
 import { billsParams, billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+import { withAuth } from "@/lib/auth";
 
 const chip = "flex-none rounded-full border border-line bg-glass-subtle px-3 py-[5px] text-[13px] text-fg hover:border-brand hover:text-ink";
 const chipOn = "border-brand bg-brand text-white hover:text-white";
@@ -93,6 +94,9 @@ export function AccountStep({ code }: { code: string | null }) {
     const a = acct.replace(/\D/g, "");
     const bad = mobile ? !/^07\d{8}$/.test(a) && "Enter the 10-digit mobile number" : !/^\d{6,14}$/.test(a) && "Enter the account number on your bill";
     if (!check({ ba: bad || "" })) return;
+    withAuth(() => next(a));
+  };
+  const next = (a: string) => {
     if (!save) return router.push(billsUrl({ step: "pay", biller: b.code, acct: a }));
     let id = db.billers.find((x) => x.code === b.code && x.account === a)?.id;
     if (!id) {

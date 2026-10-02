@@ -8,6 +8,7 @@ import { TradeTabs } from "./tabs";
 import { cn } from "cn";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+import { withAuth } from "@/lib/auth";
 
 export function Buy() {
   const { db } = useApp();
@@ -78,16 +79,19 @@ export function Buy() {
             ) : (
               <>
                 <Checkbox checked={agreed} onChange={setAgreed} className="mt-0">
-                  Tell me at {contact} when buying opens.
+                  Tell me {contact && `at ${contact} `}when buying opens.
                 </Checkbox>
                 <Button
                   size="lg"
                   className="mt-3.5"
                   disabled={!agreed}
-                  onClick={() => {
-                    commit((db) => void (db.waitlist = { email: contact, at: Date.now() }));
-                    toast("You’re on the list");
-                  }}
+                  onClick={() =>
+                    withAuth(() => {
+                      // Read the contact inside commit: it's empty until sign-in.
+                      commit((db) => void (db.waitlist = { email: db.user?.email || db.user?.phone || "", at: Date.now() }));
+                      toast("You’re on the list");
+                    })
+                  }
                 >
                   Notify me
                 </Button>

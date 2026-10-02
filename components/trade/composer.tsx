@@ -11,6 +11,7 @@ import { fmt, initials, mask } from "@/lib/format";
 import { refreshFx, useFx } from "@/lib/fx";
 import { daySpent, eligible, mName, quote, type Quote } from "@/lib/backend";
 import { activeEx, activePayee, commit, patchDraft, payeesFor, useApp } from "@/lib/store";
+import { withAuth } from "@/lib/auth";
 import { accountUrl, addMethodUrl, tradeUrl } from "@/lib/params";
 import { ArrowUpDown, ChevronRight, Plus } from "lucide-react";
 
@@ -107,7 +108,7 @@ export function Composer({ tab, onPickPayee, onReview }: { tab: Tab; onPickPayee
     dis = true;
   } else label = "Review";
 
-  const go = () => (href ? router.push(href) : onReview());
+  const go = () => withAuth(() => (href ? router.push(href) : onReview()));
 
   const update = (amt: string, cur: Incur) => {
     setAmount(amt);
