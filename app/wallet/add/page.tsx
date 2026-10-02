@@ -27,7 +27,7 @@ export default function AddMethodPage() {
                 <Pmi k="justpay">JustPay</Pmi>
               </span>
               <b>Bank account</b>
-              <small>Connect your bank with JustPay. Pay bills in rupees, with no card needed.</small>
+              <small>Connect your bank with JustPay. Pay reloads in rupees, with no card needed.</small>
             </Link>
             <Link className={tile} href={addMethodUrl("card", ret)}>
               <span className="flex flex-wrap gap-1.5">
@@ -36,12 +36,13 @@ export default function AddMethodPage() {
                 <Pmi k="amex">AMEX</Pmi>
               </span>
               <b>Debit or credit card</b>
-              <small>Visa, Mastercard or Amex, for bills and reloads.</small>
+              <small>Visa, Mastercard or Amex, for reloads.</small>
             </Link>
           </div>
           <Panel className="mt-3.5 py-1.5">
             <Kv label="Sell or send USDT">Exchange account</Kv>
-            <Kv label="Pay bills and reloads">Any method</Kv>
+            <Kv label="Pay bills">Exchange account (USDT)</Kv>
+            <Kv label="Mobile reloads">Any method</Kv>
             <Kv label="Buy USDT (coming soon)">JustPay bank account only</Kv>
           </Panel>
         </div>

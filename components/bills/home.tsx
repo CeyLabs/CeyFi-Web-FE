@@ -5,7 +5,7 @@ import { Plus, Search } from "lucide-react";
 import { TxRow } from "../activity";
 import { ButtonLink, Card, Empty, Legal, ListPanel, PageHead, Pad, SectionTitle, TitleLink, col, fine } from "../ui";
 import { CAT_ICON, CATS, SavedRow } from "./shared";
-import { BILLERS } from "@/lib/config";
+import { useBillers, useLiveSaved } from "@/hooks/bills";
 import { lkr } from "@/lib/format";
 import { billsUrl } from "@/lib/params";
 import { useApp } from "@/lib/store";
@@ -20,19 +20,23 @@ export const searchLink =
 
 export function BillsHome() {
   const { db } = useApp();
+  const { data: billers } = useBillers();
+  const saved = useLiveSaved();
   const paid = db.tx.filter((t) => t.kind === "bill");
+  // Only categories that have billers; all of them until the list arrives.
+  const cats = billers ? CATS.filter(([k]) => billers.some((b) => b.cat === k)) : CATS.filter(([k]) => k !== "other");
 
   return (
     <>
       <PageHead title="Bills" />
       <Pad>
         <Link className={searchLink} href={billsUrl({ step: "find" })}>
-          <Search /> Search {BILLERS.length} billers
+          <Search /> {billers ? `Search ${billers.length} billers` : "Search billers"}
         </Link>
 
         <SectionTitle>Pay a bill</SectionTitle>
         <div className="grid grid-cols-4 gap-2 sm:gap-2.5 lg:grid-cols-8">
-          {CATS.map(([k, c]) => (
+          {cats.map(([k, c]) => (
             <Link key={k} className={catTile} href={billsUrl({ step: "find", cat: k })}>
               <span className={catIcon}>{CAT_ICON[k]}</span>
               {c.short}
@@ -42,10 +46,10 @@ export function BillsHome() {
 
         <div className="mt-1.5 grid gap-[18px] lg:grid-cols-2">
           <div className="flex flex-col">
-            <SectionTitle action={db.billers.length ? <TitleLink href={billsUrl({ step: "billers" })}>See all</TitleLink> : null}>Saved billers</SectionTitle>
+            <SectionTitle action={saved.length ? <TitleLink href={billsUrl({ step: "billers" })}>See all</TitleLink> : null}>Saved billers</SectionTitle>
             <ListPanel className="flex flex-1 flex-col">
-              {db.billers.length ? (
-                db.billers.slice(0, 4).map((b) => <SavedRow key={b.id} db={db} b={b} />)
+              {saved.length ? (
+                saved.slice(0, 4).map((b) => <SavedRow key={b.id} db={db} b={b} />)
               ) : (
                 <Empty title="No saved billers" className={emptyFill}>
                   Save a biller when you pay it, and it shows up here.
@@ -78,6 +82,7 @@ export function BillsHome() {
 
 export function SavedBillers() {
   const { db } = useApp();
+  const saved = useLiveSaved();
   return (
     <>
       <PageHead
@@ -93,8 +98,8 @@ export function SavedBillers() {
       <Pad>
         <div className={col}>
           <ListPanel>
-            {db.billers.length ? (
-              db.billers.map((b) => <SavedRow key={b.id} db={db} b={b} detail />)
+            {saved.length ? (
+              saved.map((b) => <SavedRow key={b.id} db={db} b={b} detail />)
             ) : (
               <Empty title="No saved billers">
                 <ButtonLink size="sm" href={billsUrl({ step: "find" })} className="mt-2">

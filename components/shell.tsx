@@ -14,6 +14,7 @@ import { loadFx } from "@/lib/fx";
 import { isExpired } from "@/lib/backend";
 import { onToast } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
+import { BillTxSync } from "@/hooks/bills";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
 /** Which nav item is active: trade screens map to their tab, sub-routes to their parent. */
@@ -157,6 +158,7 @@ export function Frame({ children }: { children: ReactNode }) {
         </main>
       </div>
       <BottomNav />
+      <BillTxSync />
     </>
   );
 }

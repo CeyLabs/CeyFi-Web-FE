@@ -115,7 +115,7 @@ function RecDetail({ x }: { x: Recurring }) {
     }
     const amt = amountDue(x);
     const t = commit((db) =>
-      newTx(db, { kind: x.type as "bill" | "reload", cp: x.cp, method_id: m.id, lkr: amt, fee_lkr: CFG.bill_fee, account: x.account, state: "processing", recurring_id: x.id }),
+      newTx(db, { kind: "reload", cp: x.cp, method_id: m.id, lkr: amt, fee_lkr: CFG.reload_fee, account: x.account, state: "processing", recurring_id: x.id }),
     )!;
     router.push(`/activity/${t.id}`);
   };

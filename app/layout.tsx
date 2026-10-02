@@ -4,6 +4,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Suspense } from "react";
 import { Frame, Toast } from "@/components/shell";
 import { SignInDialog } from "@/components/signin";
+import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CeyPay",
-  description: "Sell USDT to your bank, send rupees home, and pay bills with cards, JustPay or your exchange account.",
+  description: "Sell USDT to your bank, send rupees home, and pay bills with USDT through Binance, Bybit or KuCoin Pay.",
 };
 
 export const viewport: Viewport = {
@@ -33,13 +34,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <NuqsAdapter>
-          <Suspense>
-            <Frame>{children}</Frame>
-          </Suspense>
-          <SignInDialog />
-          <Toast />
-        </NuqsAdapter>
+        <Providers>
+          <NuqsAdapter>
+            <Suspense>
+              <Frame>{children}</Frame>
+            </Suspense>
+            <SignInDialog />
+            <Toast />
+          </NuqsAdapter>
+        </Providers>
       </body>
     </html>
   );

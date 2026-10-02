@@ -2,11 +2,12 @@
 
 import { CalendarCheck, FileText, LifeBuoy, Share } from "lucide-react";
 import { useEffect } from "react";
-import { Alert, Button, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Stat, StepDot, fine } from "./ui";
+import { Alert, Button, ButtonLink, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Stat, StepDot, fine } from "./ui";
 import { cn } from "cn";
 import { fmt, dLong, dShort, dTime, lkr } from "@/lib/format";
-import { M, advance, isLive, mName, stLabel, txTitle, type DB, type Tx } from "@/lib/backend";
-import { activityTxUrl, activityUrl, infoUrl } from "@/lib/params";
+import { M, advance, isLive, mName, stLabel, txTitle, txVia, type DB, type Tx } from "@/lib/backend";
+import { useSyncBillTx } from "@/hooks/bills";
+import { activityTxUrl, activityUrl, billsUrl, infoUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -49,10 +50,10 @@ export function TxRow({ db, t, selected, compact, q }: { db: DB; t: Tx; selected
       selected={selected}
       logo={<CpLogo cp={t.cp} />}
       title={txTitle(db, t)}
-      sub={compact ? `${dShort(t.created)} · ${mName(m)}` : `${mName(m)} · ${dShort(t.created)}`}
+      sub={compact ? `${dShort(t.created)} · ${txVia(db, t)}` : `${txVia(db, t)} · ${dShort(t.created)}`}
       c2={
         <span className="inline-flex items-center gap-1.5">
-          <PmIcon m={m} /> <span className="truncate">{mName(m)}</span>
+          <PmIcon m={m} /> <span className="truncate">{txVia(db, t)}</span>
         </span>
       }
       c3={dLong(t.created)}
@@ -105,13 +106,13 @@ function Timeline({ db, t }: { db: DB; t: Tx }) {
 /** Transaction detail pane. Advances live transactions while open. */
 export function TxDetail({ t }: { t: Tx }) {
   const { db } = useApp();
-  const m = M(db, t.method_id);
   const title = txTitle(db, t);
   const same = db.tx.filter((x) => x.cp.key === t.cp.key).length;
   const fx = t.kind === "sell" || t.kind === "remit";
   const rec = t.recurring_id ? db.recurring.find((r) => r.id === t.recurring_id) : undefined;
   const live = isLive(t.state);
   useAdvance(t);
+  useSyncBillTx(t);
 
   const rename = () => {
     const n = prompt("Rename this", title);
@@ -151,13 +152,19 @@ export function TxDetail({ t }: { t: Tx }) {
         </>
       )}
       {t.message && !live && t.state !== "completed" && <Alert>{t.message}</Alert>}
-      {live && <p className={cn(fine, "mt-3 text-center")}>You can leave this page. It carries on, and stays here in Activity.</p>}
+      {t.payment_id && t.state === "charging" ? (
+        <ButtonLink size="lg" className="mt-3" href={billsUrl({ step: "paid", tx: t.payment_id })}>
+          Finish paying in {txVia(db, t)}
+        </ButtonLink>
+      ) : (
+        live && <p className={cn(fine, "mt-3 text-center")}>You can leave this page. It carries on, and stays here in Activity.</p>
+      )}
 
       <DCard>
         <DRow label="Status" strong>
           <Stat tone={t.state}>{stLabel(t.state)}</Stat>
         </DRow>
-        <DRow label="Payment">{mName(m)}</DRow>
+        <DRow label="Payment">{txVia(db, t)}</DRow>
         {t.account && (
           <DRow label={t.kind === "reload" ? "Mobile" : "Account"}>
             <span className="font-mono">{t.account}</span>

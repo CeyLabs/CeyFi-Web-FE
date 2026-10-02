@@ -173,7 +173,7 @@ function AddCard({ ret }: { ret: string | null }) {
               <input className={inputCls} id="cb" autoComplete="street-address" placeholder="House no., street, city" aria-invalid={!!errs.cb} value={billing} onChange={(e) => (setBilling(e.target.value), clear("cb"))} />
             </Field>
             <Checkbox checked={makeDefault} onChange={setMakeDefault}>
-              Make this my default for bills and reloads
+              Make this my default for reloads
             </Checkbox>
             <Button size="lg" className="mt-4" onClick={save}>
               Add card

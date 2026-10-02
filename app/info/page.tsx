@@ -11,7 +11,8 @@ const td = "border-b border-line-subtle px-1.5 py-3 text-left align-top last:tex
 function Fees() {
   const rows: [string, string][] = [
     ["Sell & send (exchange + CeyPay)", `~${CFG.fee_pct}% of USDT`],
-    ["Bills & reloads (card or JustPay)", "Free"],
+    ["Bills (Binance, Bybit or KuCoin Pay)", "Free"],
+    ["Reloads (card or JustPay)", "Free"],
     ["Bank payout (CEFT)", "Free"],
     ["Minimum transfer", `${CFG.min_usdt} USDT`],
     ["Daily limit", `${CFG.daily_limit_usdt.toLocaleString()} USDT`],
@@ -43,7 +44,7 @@ function Fees() {
 const FAQ: [string, string][] = [
   [
     "Which payment methods can I use?",
-    "Exchange accounts (Binance, Bybit, KuCoin) for selling, sending and paying in USDT. Cards and JustPay bank accounts for bills and reloads in rupees. Cards can’t be used for digital assets.",
+    "Exchange accounts (Binance, Bybit, KuCoin) for selling, sending and paying bills in USDT. Cards and JustPay bank accounts for reloads in rupees. Cards can’t be used for digital assets.",
   ],
   ["What is JustPay?", "LankaClear’s account-to-account service. You approve CeyPay once in your bank app, then confirm each payment within your limit."],
   [

@@ -32,7 +32,7 @@ export default function Home() {
   const steps: [string, string, boolean, string][] = [
     ["Verify your identity", "Needed to sell or send", db.kyc === "verified", accountUrl({ flow: "verify" })],
     ["Link an exchange account", "Binance, Bybit or KuCoin", db.methods.some((m) => m.type === "exchange"), addMethodUrl("exchange")],
-    ["Add a card or JustPay", "For bills and reloads", db.methods.some((m) => m.type !== "exchange"), addMethodUrl()],
+    ["Add a card or JustPay", "For mobile reloads", db.methods.some((m) => m.type !== "exchange"), addMethodUrl()],
     ["Add your bank account", "Where your rupees land", db.payees.some((p) => p.is_self), accountUrl({ flow: "payee", self: true })],
   ];
   const done = steps.filter((s) => s[2]).length;

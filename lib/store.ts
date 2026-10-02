@@ -43,6 +43,13 @@ function load() {
   if (state.version >= 0) return;
   const d = state.db;
   for (const k of DB_KEYS) (d as Record<string, unknown>)[k] = ls.get(k, d[k]);
+  // Drop demo-era bill data: bill payments not backed by the API, and the old simulated bill autopay.
+  const tx = d.tx.filter((t) => t.kind !== "bill" || !!t.payment_id);
+  const recurring = d.recurring.filter((r) => (r.type as string) !== "bill");
+  if (tx.length !== d.tx.length || recurring.length !== d.recurring.length) {
+    Object.assign(d, { tx, recurring });
+    save();
+  }
   state.version = 0;
 }
 

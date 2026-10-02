@@ -381,29 +381,12 @@ export function PmIcon({ m, className }: { m: Method | undefined | null; classNa
   );
 }
 
+/** Mobile operators, for reloads. Bill payments use live PayGo billers, which get initials. */
 const BILLER_COLORS: Record<string, [string, string]> = {
-  CEB: ["#f6a800", "#1a1300"],
-  LECO: ["#e2231a", "#fff"],
-  NWSDB: ["#0072bc", "#fff"],
-  SLT: ["#1c3f94", "#fff"],
   Dialog: ["#ec1c24", "#fff"],
-  DIALOG_PP: ["#ec1c24", "#fff"],
-  DIALOGTV: ["#ec1c24", "#fff"],
   Mobitel: ["#009a44", "#fff"],
   Hutch: ["#ff6a13", "#fff"],
   Airtel: ["#e40000", "#fff"],
-  AIA: ["#d31145", "#fff"],
-  MOBITEL_PP: ["#009a44", "#fff"],
-  HUTCH_PP: ["#ff6a13", "#fff"],
-  AIRTEL_PP: ["#e40000", "#fff"],
-  DIALOG_BB: ["#ec1c24", "#fff"],
-  PEOTV: ["#5b2a86", "#fff"],
-  LITRO: ["#0a8f3c", "#fff"],
-  LAUGFS: ["#f37021", "#fff"],
-  SLIC: ["#00529b", "#fff"],
-  CEYLINCO: ["#c8102e", "#fff"],
-  CMC: ["#7a1f2b", "#fff"],
-  KMC: ["#1f5f3a", "#fff"],
 };
 
 /** Counterparty logo: generated initials for people, brand colours for billers. */
@@ -426,10 +409,11 @@ export function CpLogo({ cp, big }: { cp: Counterparty | { kind: "person"; name:
     );
   }
   const code = "code" in cp ? cp.code : undefined;
-  const [bg, fg] = (code && BILLER_COLORS[code]) || [`hsl(${hue(cp.name)} 45% 40%)`, "#fff"];
+  const brand = code ? BILLER_COLORS[code] : undefined;
+  const [bg, fg] = brand || [`hsl(${hue(cp.name)} 45% 40%)`, "#fff"];
   return (
     <span className={cls} style={{ background: bg, color: fg }}>
-      {(code || cp.name).slice(0, 3).replace("_", "")}
+      {brand && code ? code.slice(0, 3).replace("_", "") : initials(cp.name)}
     </span>
   );
 }

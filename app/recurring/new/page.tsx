@@ -8,7 +8,7 @@ import { useState, type ReactNode } from "react";
 import { I } from "@/components/icons";
 import { Avatar, Button, ButtonLink, Field, PageHead, Pad, Panel, TwoCol, col, fine, inputCls, selectCls, tile, tileOn, useErrors } from "@/components/ui";
 import { cn } from "cn";
-import { BILLERS, CFG, OPS, bankShort } from "@/lib/config";
+import { CFG, OPS, bankShort } from "@/lib/config";
 import { mask4, phone, uid } from "@/lib/format";
 import { defaultFor, eligible, mName, type Recurring, type Use } from "@/lib/backend";
 import { accountUrl, addMethodUrl, recNewParams, recNewUrl, recurringTypes } from "@/lib/params";
@@ -17,7 +17,6 @@ import { toast } from "@/lib/toast";
 
 type RType = (typeof recurringTypes)[number];
 const TYPES: [RType, string, ReactNode][] = [
-  ["bill", "Bill autopay", I.bill],
   ["reload", "Mobile reload", I.phone],
   ["remit", "Send money", I.send],
 ];
@@ -80,16 +79,14 @@ function Form({ type }: { type: RType }) {
   const { db } = useApp();
   const use: Use = type === "remit" ? "send" : type;
   const [method, setMethod] = useState(() => defaultFor(db, use)?.id || "");
-  const [biller, setBiller] = useState(BILLERS[0].code);
   const [account, setAccount] = useState("");
-  const [cap, setCap] = useState("20000");
   const [amount, setAmount] = useState(type === "reload" ? "500" : "25000");
   const [freq, setFreq] = useState<"monthly" | "weekly">("monthly");
   const [day, setDay] = useState(type === "remit" ? "28" : "1");
   const recipients = db.payees.filter((p) => !p.is_self);
   const [payee, setPayee] = useState(recipients[0]?.id || "");
   const [purpose, setPurpose] = useState(CFG.purposes[0]);
-  const { errs, clear, check } = useErrors(["na", "nc", "nv"] as const);
+  const { errs, clear, check } = useErrors(["na", "nv"] as const);
 
   const digits = account.replace(/\D/g, "");
   const op = OPS[digits.slice(0, 3)];
@@ -99,15 +96,9 @@ function Form({ type }: { type: RType }) {
     if (!pm) return toast("Add a payment method first");
     const base = { id: uid("rc_"), type, freq: "monthly" as const, method_id: pm.id, status: "active" as const, created: Date.now() };
     let r: Recurring;
-    if (type === "bill") {
-      const b = BILLERS.find((x) => x.code === biller)!,
-        a = account.replace(/\s/g, ""),
-        c = Number(cap);
-      if (!check({ na: /^\d{6,14}$/.test(a) ? "" : "Enter the account number on your bill", nc: c >= 100 ? "" : "Enter at least LKR 100", nv: "" })) return;
-      r = { ...base, name: b.name, cp: { kind: "biller", code: b.code, name: b.name, key: b.code }, plan: "Monthly autopay", account: a, amount: b.varies ? null : Math.min(c, 2500), cap: c, day: 12 };
-    } else if (type === "reload") {
+    if (type === "reload") {
       const v = Number(amount);
-      if (!check({ na: /^07\d{8}$/.test(digits) && op ? "" : "Enter a Sri Lankan mobile number", nv: v >= 50 ? "" : "Minimum LKR 50", nc: "" })) return;
+      if (!check({ na: /^07\d{8}$/.test(digits) && op ? "" : "Enter a Sri Lankan mobile number", nv: v >= 50 ? "" : "Minimum LKR 50" })) return;
       r = {
         ...base,
         name: op + " reload",
@@ -122,7 +113,7 @@ function Form({ type }: { type: RType }) {
       const p = db.payees.find((x) => x.id === payee),
         v = Number(amount);
       if (!p) return toast("Add a recipient first");
-      if (!check({ nv: v >= 1000 ? "" : "Minimum LKR 1,000", na: "", nc: "" })) return;
+      if (!check({ nv: v >= 1000 ? "" : "Minimum LKR 1,000", na: "" })) return;
       const name = p.nickname || p.account_name;
       r = { ...base, name, cp: { kind: "person", name, key: "p:" + p.id }, plan: "Monthly · " + purpose, payee_id: p.id, amount: v, purpose, day: Number(day) || 28 };
     }
@@ -147,25 +138,6 @@ function Form({ type }: { type: RType }) {
 
   return (
     <>
-      {type === "bill" && (
-        <>
-          <Field id="nb" label="Biller" className="mt-0">
-            <select className={selectCls} id="nb" value={biller} onChange={(e) => setBiller(e.target.value)}>
-              {BILLERS.map((b) => (
-                <option key={b.code} value={b.code}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field id="na" label="Account number" error={errs.na}>
-            <input className={cn(inputCls, "font-mono")} id="na" inputMode="numeric" aria-invalid={!!errs.na} value={account} onChange={(e) => (setAccount(e.target.value), clear("na"))} />
-          </Field>
-          <Field id="nc" label="Pay the full bill each month, up to (LKR)" error={errs.nc} hint="If a bill is higher than this, we’ll ask you before paying.">
-            <input className={cn(inputCls, "font-mono")} id="nc" type="number" aria-invalid={!!errs.nc} value={cap} onChange={(e) => (setCap(e.target.value), clear("nc"))} />
-          </Field>
-        </>
-      )}
       {type === "reload" && (
         <>
           <Field id="na" label="Mobile number" error={errs.na} hint={op ? `${op} detected` : undefined} className="mt-0">

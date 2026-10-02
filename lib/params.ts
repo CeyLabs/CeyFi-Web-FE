@@ -41,9 +41,9 @@ export const activityUrl = (q?: string) => activitySer("/activity", { q: q || nu
 /** A transaction in Activity, keeping the list's search. */
 export const activityTxUrl = (id: string, q?: string) => activitySer(`/activity/${id}`, { q: q || null });
 
-export const recurringTypes = ["bill", "reload", "remit"] as const;
+export const recurringTypes = ["reload", "remit"] as const;
 export const recNewParams = {
-  type: parseAsStringLiteral(recurringTypes).withDefault("bill"),
+  type: parseAsStringLiteral(recurringTypes).withDefault("reload"),
 };
 const recNewSer = createSerializer(recNewParams);
 export const recNewUrl = (type: (typeof recurringTypes)[number]) => recNewSer("/recurring/new", { type });

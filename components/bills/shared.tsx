@@ -1,9 +1,10 @@
 "use client";
 
-import { Droplet, Flame, Landmark, ShieldCheck, Smartphone, Tv, Wifi, Zap } from "lucide-react";
+import { Droplet, Flame, Landmark, Loader2, Receipt, ShieldCheck, Smartphone, Tv, Wifi, Zap } from "lucide-react";
 import type { ReactNode } from "react";
-import { ButtonLink, CpLogo, Empty, LRow, PageHead, button } from "../ui";
-import { BILL_CATS, billerBy, type BillCat } from "@/lib/config";
+import { Button, ButtonLink, CpLogo, Empty, LRow, PageHead, button } from "../ui";
+import { useBiller } from "@/hooks/bills";
+import { BILL_CATS, type BillCat } from "@/lib/config";
 import { dShort, lkr, mask4 } from "@/lib/format";
 import { billerCp, lastPaid, type DB, type SavedBiller } from "@/lib/backend";
 import { billsUrl } from "@/lib/params";
@@ -17,6 +18,7 @@ export const CAT_ICON: Record<BillCat, ReactNode> = {
   gas: <Flame />,
   insurance: <ShieldCheck />,
   rates: <Landmark />,
+  other: <Receipt />,
 };
 
 export const CATS = Object.entries(BILL_CATS) as [BillCat, (typeof BILL_CATS)[BillCat]][];
@@ -26,7 +28,7 @@ export const acct4 = (a: string) => "•• " + mask4(a);
 
 /** Saved biller row. `detail` shows the account instead of the last payment. */
 export function SavedRow({ db, b, detail }: { db: DB; b: SavedBiller; detail?: boolean }) {
-  const biller = billerBy(b.code);
+  const { biller } = useBiller(b.code);
   if (!biller) return null;
   const last = !detail && lastPaid(db, b.code, b.account);
   return (
@@ -34,10 +36,32 @@ export function SavedRow({ db, b, detail }: { db: DB; b: SavedBiller; detail?: b
       variant="w3"
       href={billsUrl({ step: "pay", saved: b.id })}
       logo={<CpLogo cp={billerCp(biller)} />}
-      title={db.names[biller.code] || biller.name}
+      title={db.names[biller.id] || biller.name}
       sub={last ? `Last paid ${lkr(last.lkr)} · ${dShort(last.created)}` : `${BILL_CATS[biller.cat].label} · Acct ${acct4(b.account)}`}
       end={<span className={button({ size: "sm", className: "font-sans" })}>Pay</span>}
     />
+  );
+}
+
+/** Loading spinner, or the error with a retry, for a list or screen that waits on the API. */
+export function Pending({ error, onRetry, label = "Loading billers" }: { error?: Error | null; onRetry?: () => void; label?: string }) {
+  if (error)
+    return (
+      <Empty title="Couldn’t load billers">
+        {error.message}
+        <br />
+        {onRetry && (
+          <Button size="sm" variant="ghost" className="mt-2.5" onClick={onRetry}>
+            Try again
+          </Button>
+        )}
+      </Empty>
+    );
+  return (
+    <Empty>
+      <Loader2 className="mx-auto mb-2 animate-spin text-muted" size={22} />
+      {label}…
+    </Empty>
   );
 }
 
