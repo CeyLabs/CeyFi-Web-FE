@@ -1,4 +1,16 @@
-import { ArrowDownToLine, ArrowUpFromLine, House, List, Send, User } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  CalendarCheck,
+  ChartLine,
+  Clock,
+  House,
+  Receipt,
+  Send,
+  Smartphone,
+  Wallet,
+} from "lucide-react";
 
 export const Logo = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 649.76 208.83" role="img" aria-label="CeyPay">
@@ -11,12 +23,17 @@ export const Logo = () => (
   </svg>
 );
 
-/** Nav / quick-action icons. */
+/** Nav / action icons. */
 export const I = {
   home: <House />,
+  activity: <Clock />,
+  recurring: <CalendarCheck />,
+  wallet: <Wallet />,
   sell: <ArrowDownToLine />,
   send: <Send />,
   buy: <ArrowUpFromLine />,
-  activity: <List />,
-  account: <User />,
+  move: <ArrowLeftRight />,
+  bill: <Receipt />,
+  phone: <Smartphone />,
+  rates: <ChartLine />,
 };

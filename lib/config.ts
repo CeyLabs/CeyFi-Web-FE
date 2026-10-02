@@ -3,7 +3,8 @@ export const CFG = {
   min_usdt: 5,
   daily_limit_usdt: 2000,
   tol_pct: 0.5,
-  base_rate: 300,
+  base_rate: 326.25,
+  bill_fee: 0,
   company: "CeylonCash PVT LTD",
   reg_no: "[PV 000000]",
   reg_status: "[to be confirmed under Sri Lanka’s VASP framework]",
@@ -30,6 +31,40 @@ export const BANKS: Bank[] = [
   { code: 7311, name: "Pan Asia Banking Corporation PLC" },
   { code: 7302, name: "Union Bank of Colombo PLC" },
 ].sort((a, b) => a.name.localeCompare(b.name));
+
+/** "Hatton National Bank PLC" → "HNB", for tight spaces. */
+export const bankShort = (n: string) =>
+  n
+    .replace(/ (PLC|Bank PLC)$/, "")
+    .replace(" Bank", "")
+    .replace("Hatton National", "HNB")
+    .replace("Commercial", "ComBank")
+    .replace("National Development", "NDB")
+    .replace("Nations Trust", "NTB")
+    .replace("National Savings", "NSB");
+
+export type Biller = { code: string; name: string; cat: string; varies: boolean };
+export const BILLERS: Biller[] = [
+  { code: "CEB", name: "Ceylon Electricity Board", cat: "Electricity", varies: true },
+  { code: "LECO", name: "LECO", cat: "Electricity", varies: true },
+  { code: "NWSDB", name: "National Water Supply", cat: "Water", varies: true },
+  { code: "SLT", name: "SLT Broadband", cat: "Internet", varies: true },
+  { code: "DIALOG_PP", name: "Dialog Postpaid", cat: "Mobile", varies: true },
+  { code: "DIALOGTV", name: "Dialog TV", cat: "TV", varies: false },
+  { code: "AIA", name: "AIA Insurance", cat: "Insurance", varies: false },
+];
+
+/** Mobile prefix → operator, for reloads. */
+export const OPS: Record<string, string> = {
+  "070": "Mobitel",
+  "071": "Mobitel",
+  "072": "Hutch",
+  "078": "Hutch",
+  "074": "Dialog",
+  "076": "Dialog",
+  "077": "Dialog",
+  "075": "Airtel",
+};
 
 export type Tab = "sell" | "send";
 export const COPY = {

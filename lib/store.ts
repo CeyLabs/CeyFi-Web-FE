@@ -2,12 +2,12 @@
 
 import { useSyncExternalStore } from "react";
 import type { Tab } from "./config";
-import type { Account, DB, Payee, Quote } from "./backend";
+import { eligible, defaultFor, type DB, type ExchangeMethod, type Payee, type Quote, type User } from "./backend";
 
 /* Client-side state persisted to localStorage (stand-in for the backend). */
 
-const PREFIX = "cpapp_";
-const ls = {
+const PREFIX = "cpw_";
+export const ls = {
   get<T>(k: string, d: T): T {
     try {
       return JSON.parse(localStorage.getItem(PREFIX + k) as string) ?? d;
@@ -26,13 +26,14 @@ export type Draft = {
   incur: "USDT" | "LKR";
   amount: string;
   payee: Record<Tab, string | null>;
+  /** Exchange method chosen in the composer. */
   account: string | null;
   q: Quote | null;
 };
 
-const DB_KEYS = ["user", "profile", "kyc", "accounts", "payees", "tx", "waitlist"] as const;
+const DB_KEYS = ["user", "kyc", "methods", "payees", "tx", "recurring", "waitlist", "defaultId", "names"] as const;
 
-const emptyDb = (): DB => ({ user: null, profile: null, kyc: "not_started", accounts: [], payees: [], tx: [], waitlist: null });
+const emptyDb = (): DB => ({ user: null, kyc: "not_started", methods: [], payees: [], tx: [], recurring: [], waitlist: null, defaultId: null, names: {} });
 const emptyDraft = (): Draft => ({ incur: "USDT", amount: "", payee: { sell: null, send: null }, account: null, q: null });
 
 const state = { version: -1, db: emptyDb(), draft: emptyDraft() };
@@ -42,16 +43,11 @@ function load() {
   if (state.version >= 0) return;
   const d = state.db;
   for (const k of DB_KEYS) (d as Record<string, unknown>)[k] = ls.get(k, d[k]);
-  state.draft.payee = { sell: ls.get("last_payee_sell", null), send: ls.get("last_payee_send", null) };
-  state.draft.account = ls.get("last_acc", null);
   state.version = 0;
 }
 
 function save() {
   for (const k of DB_KEYS) ls.set(k, state.db[k]);
-  ls.set("last_payee_sell", state.draft.payee.sell);
-  ls.set("last_payee_send", state.draft.payee.send);
-  ls.set("last_acc", state.draft.account);
 }
 
 /** Mutate db/draft, persist, and re-render subscribers. Returns `fn`'s result. */
@@ -68,6 +64,12 @@ export function commit<T>(fn?: (db: DB, draft: Draft) => T): T | undefined {
 export function patchDraft(p: Partial<Draft>) {
   Object.assign(state.draft, p);
 }
+
+/** Returning users of the demo sign-in, keyed by phone or email. */
+export const knownUser = {
+  get: (id: string) => ls.get<Omit<User, "providers" | "since"> | null>("known_" + id, null),
+  set: (id: string, u: Omit<User, "providers" | "since">) => ls.set("known_" + id, u),
+};
 
 /** Wipe all demo data. */
 export function resetAll() {
@@ -97,12 +99,12 @@ export function useApp() {
 }
 
 /* ---------- selectors ---------- */
-export const activeAccount = (db: DB, draft: Draft): Account | null =>
-  db.accounts.find((a) => a.id === draft.account) || db.accounts[0] || null;
+export const activeEx = (db: DB, draft: Draft): ExchangeMethod | null => {
+  const l = eligible(db, "sell") as ExchangeMethod[];
+  return l.find((m) => m.id === draft.account) || (defaultFor(db, "sell") as ExchangeMethod | null);
+};
 export const payeesFor = (db: DB, tab: Tab) => db.payees.filter((p) => (tab === "sell" ? p.is_self : !p.is_self));
 export const activePayee = (db: DB, draft: Draft, tab: Tab): Payee | null => {
   const l = payeesFor(db, tab);
   return l.find((p) => p.id === draft.payee[tab]) || l[0] || null;
 };
-export const need = (db: DB, draft: Draft): "signin" | "verify" | "link" | null =>
-  !db.user ? "signin" : db.kyc !== "verified" ? "verify" : !activeAccount(db, draft) ? "link" : null;

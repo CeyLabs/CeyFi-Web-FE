@@ -3,27 +3,30 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowUpRight, Check, ChevronRight, CircleAlert } from "lucide-react";
+import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search } from "lucide-react";
 import { cn } from "cn";
-import { CFG, PNAME, type Provider } from "@/lib/config";
-import { fmt, lkr } from "@/lib/format";
-import { stLabel, type Tx, type TxState } from "@/lib/backend";
-import { infoUrl } from "@/lib/params";
+import { CFG, PNAME } from "@/lib/config";
+import { fmt, hue, initials, phone } from "@/lib/format";
+import { fxDate, useFx } from "@/lib/fx";
+import { isExpired, spentBy, type Counterparty, type DB, type Method } from "@/lib/backend";
+import { infoUrl, signInUrl } from "@/lib/params";
+import { useApp } from "@/lib/store";
 
 /* ---------- shared class strings ---------- */
 
-/** Narrow centred column used by most screens. */
-export const col = "mx-auto max-w-[540px]";
+/** Content column used by form screens. */
+export const col = "max-w-[560px]";
 /** Small secondary text. */
 export const fine = "text-[12.5px] leading-normal text-muted";
 export const inputCls =
   "h-[46px] w-full rounded-[10px] border border-line bg-field px-3 text-[15px] text-ink read-only:opacity-75 focus:border-brand focus:outline-none aria-invalid:border-err";
+export const selectCls = cn(inputCls, "select-chevron pr-8");
 
 /* ---------- buttons ---------- */
 
 export const button = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium disabled:opacity-50 [&_svg]:size-4",
   {
     variants: {
       variant: {
@@ -50,15 +53,69 @@ export function ButtonLink({ variant, size, className, ...p }: ComponentProps<ty
   return <Link className={cn(button({ variant, size }), className)} {...p} />;
 }
 
+/** Square icon button used in page headers. */
+export const iconBtn =
+  "grid size-[38px] place-items-center rounded-[10px] border border-transparent text-ink hover:border-line hover:bg-glass [&_svg]:size-5";
+
+/* ---------- page frame ---------- */
+
+/** Sticky page header. The back button shows on phones only, where there's no sidebar. */
+export function PageHead({ title, right, back }: { title: ReactNode; right?: ReactNode; back?: string }) {
+  const { db } = useApp();
+  if (!db.user)
+    return (
+      <div className="mb-3">
+        <ButtonLink variant="ghost" size="sm" href={signInUrl()} className="mb-3.5">
+          ← Sign in
+        </ButtonLink>
+        <h1 className="m-0 text-[28px] font-medium text-ink">{title}</h1>
+      </div>
+    );
+  return (
+    <header className="sticky top-0 z-[6] flex h-[60px] items-center gap-3 border-b border-line-subtle bg-canvas/90 px-4 backdrop-blur-md md:h-[76px] md:px-7">
+      {back && (
+        <Link className={cn(iconBtn, "md:hidden")} href={back} aria-label="Back">
+          <ArrowLeft />
+        </Link>
+      )}
+      <h1 className="m-0 flex-none text-xl font-medium tracking-[-.5px] text-ink md:text-2xl">{title}</h1>
+      <div className="flex-1" />
+      {right}
+    </header>
+  );
+}
+
+/** Padded page body below a PageHead. */
+export function Pad({ children, className }: { children: ReactNode; className?: string }) {
+  const { db } = useApp();
+  if (!db.user) return <>{children}</>;
+  return <div className={cn("px-4 pt-4 pb-10 md:px-7 md:pt-6 md:pb-[60px]", className)}>{children}</div>;
+}
+
+export function SearchBox({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  return (
+    <label className="flex h-[38px] flex-1 items-center gap-2 rounded-[10px] border border-line bg-field px-2.5 md:w-[260px] md:flex-none">
+      <Search className="size-[18px] flex-none text-muted" />
+      <input
+        className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+        placeholder={label}
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
 /* ---------- layout ---------- */
 
 export function Panel({ className, ...p }: ComponentProps<"div">) {
-  return <div className={cn("rounded-card border border-line bg-glass p-4 max-sm:rounded-[20px] sm:p-[18px] [&+&]:mt-3", className)} {...p} />;
+  return <div className={cn("rounded-[22px] border border-line bg-glass p-[18px] [&+&]:mt-3", className)} {...p} />;
 }
 
 /** Panel whose children are list rows. */
 export function ListPanel({ className, ...p }: ComponentProps<"div">) {
-  return <Panel className={cn("px-3.5 py-1.5 sm:px-3.5 sm:py-1.5", className)} {...p} />;
+  return <Panel className={cn("p-1.5", className)} {...p} />;
 }
 
 export function Card({ className, ...p }: ComponentProps<"div">) {
@@ -68,7 +125,7 @@ export function Card({ className, ...p }: ComponentProps<"div">) {
 /** Uppercase section label with an optional action on the right. */
 export function SectionTitle({ children, action, className }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <div className={cn("mt-[22px] mb-2 flex items-center justify-between font-mono text-xs tracking-[.8px] text-muted uppercase", className)}>
+    <div className={cn("mt-6 mb-2 flex items-center justify-between font-mono text-xs tracking-[.8px] text-muted uppercase", className)}>
       {children}
       {action}
     </div>
@@ -82,8 +139,8 @@ export function TitleLink(p: ComponentProps<typeof Link>) {
 
 /** Label/value row. Renders a link when `href` is set. */
 export function Kv({ label, children, href, className }: { label: ReactNode; children: ReactNode; href?: string; className?: string }) {
-  const cls = cn("flex justify-between gap-3 border-b border-line-subtle py-2.5 text-sm last:border-b-0", className);
-  const value = <b className="inline-flex items-center gap-1 text-right font-medium text-ink">{children}</b>;
+  const cls = cn("flex justify-between gap-3 border-b border-line-subtle py-[11px] text-sm last:border-b-0", className);
+  const value = <b className="inline-flex items-center justify-end gap-1 text-right font-medium text-ink">{children}</b>;
   return href ? (
     <Link href={href} className={cls}>
       <span>{label}</span>
@@ -105,8 +162,8 @@ export const NavKv = ({ href, label }: { href: string; label: string }) => (
 
 export function Empty({ title, children, className }: { title?: ReactNode; children?: ReactNode; className?: string }) {
   return (
-    <div className={cn("px-4 py-9 text-center text-muted", className)}>
-      {title && <b className="mb-1.5 block font-medium text-ink">{title}</b>}
+    <div className={cn("px-4 py-12 text-center text-muted", className)}>
+      {title && <b className="mb-1.5 block text-base font-medium text-ink">{title}</b>}
       {children}
     </div>
   );
@@ -114,7 +171,7 @@ export function Empty({ title, children, className }: { title?: ReactNode; child
 
 export function Avatar({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cn("grid size-9 flex-none place-items-center rounded-full bg-brand-soft text-[13px] font-semibold text-brand", className)}>
+    <span className={cn("grid size-9 flex-none place-items-center rounded-full bg-brand-soft text-[13px] font-semibold text-brand [&_svg]:size-[18px]", className)}>
       {children}
     </span>
   );
@@ -138,53 +195,71 @@ export const Soon = ({ className }: { className?: string }) => (
   <span className={cn("rounded-full bg-warn-soft px-1.5 py-0.5 font-mono text-[9.5px] tracking-[.4px] text-warn uppercase", className)}>Soon</span>
 );
 
-/* ---------- status ---------- */
+/** Large tile choice (add method, recurring type). */
+export const tile =
+  "flex flex-col gap-2.5 rounded-[18px] border border-line bg-glass-subtle p-4 text-left text-fg hover:border-brand [&_b]:text-[15px] [&_b]:font-medium [&_b]:text-ink [&_small]:text-[12.5px] [&_small]:leading-[1.4] [&_small]:text-muted";
+export const tileOn = "border-brand bg-brand-soft";
 
-const STAT: Partial<Record<TxState, string>> = {
-  completed: "bg-ok-soft text-ok",
-  charging: "bg-brand-soft text-brand",
-  converting: "bg-brand-soft text-brand",
-  paying_out: "bg-brand-soft text-brand",
-  rate_changed: "bg-warn-soft text-warn",
-  refund_requested: "bg-warn-soft text-warn",
-  charge_failed: "bg-err-soft text-err",
-  payout_failed: "bg-err-soft text-err",
-};
-
-/** Pill badge. `tone` picks colours by transfer state; defaults to the green "ok" style. */
-export function Stat({ tone = "completed", children }: { tone?: TxState; children: ReactNode }) {
-  return <span className={cn("inline-block rounded-full px-2 py-0.5 font-mono text-[11.5px]", STAT[tone])}>{children}</span>;
-}
-
-/* ---------- navigation ---------- */
-
-/** `to`: a path, or a callback for in-page sub-views. Omitted goes back in history. */
-type BackTo = string | (() => void);
-
-export function Back({ to, label }: { to?: BackTo; label?: string }) {
-  const router = useRouter();
-  const onClick = () => (typeof to === "function" ? to() : to ? router.push(to) : router.back());
+/** Spinner/check step used in progress lists. */
+export function StepDot({ state }: { state: "" | "done" | "run" | "fail" }) {
   return (
-    <button
-      className="grid size-9 flex-none place-items-center rounded-[10px] border border-line bg-glass text-ink"
-      onClick={onClick}
-      aria-label={label || "Back"}
+    <span
+      className={cn(
+        "mt-0.5 grid size-5 flex-none place-items-center rounded-full border-2 border-line text-[11px] text-black",
+        state === "done" && "border-ok bg-ok",
+        state === "fail" && "border-err bg-err",
+        state === "run" && "animate-spin border-brand border-t-transparent",
+      )}
     >
-      <ArrowLeft size={16} />
-    </button>
+      {state === "done" ? <Check size={12} strokeWidth={3} /> : state === "fail" ? "!" : null}
+    </span>
   );
 }
 
-/** View header. `to={false}` hides the back button; `undefined` goes back in history. */
-export function Vh({ title, sub, to }: { title: ReactNode; sub?: ReactNode; to?: BackTo | false }) {
+/* ---------- status ---------- */
+
+const STAT: Record<string, string> = {
+  completed: "bg-ok-soft text-ok",
+  active: "bg-ok-soft text-ok",
+  charging: "bg-brand-soft text-brand",
+  converting: "bg-brand-soft text-brand",
+  paying_out: "bg-brand-soft text-brand",
+  processing: "bg-brand-soft text-brand",
+  rate_changed: "bg-warn-soft text-warn",
+  refund_requested: "bg-warn-soft text-warn",
+  paused: "bg-warn-soft text-warn",
+  charge_failed: "bg-err-soft text-err",
+  payout_failed: "bg-err-soft text-err",
+  failed: "bg-err-soft text-err",
+};
+
+/** Pill badge. `tone` picks colours by state; defaults to the green "ok" style. */
+export function Stat({ tone = "completed", children, className, title }: { tone?: string; children: ReactNode; className?: string; title?: string }) {
   return (
-    <div className="mt-1 mb-4 flex items-center gap-2.5">
-      {to !== false && <Back to={to} />}
-      <div>
-        <h1 className="m-0 text-2xl leading-tight font-medium tracking-[-.6px] text-ink">{title}</h1>
-        {sub ? <p className="mt-0.5 text-sm text-muted">{sub}</p> : null}
-      </div>
-    </div>
+    <span title={title} className={cn("inline-block rounded-full px-2 py-0.5 font-mono text-[11.5px] whitespace-nowrap", STAT[tone], className)}>
+      {children}
+    </span>
+  );
+}
+
+/** Live / Snapshot / Stale marker for FX rates. */
+export function FxBadge() {
+  const fx = useFx();
+  if (fx.data._meta?.stale) return <Stat tone="rate_changed">Stale</Stat>;
+  if (fx.source === "live") return <Stat>Live</Stat>;
+  return (
+    <Stat tone="charging" title="Live rates couldn’t be loaded, so the last known rates are shown">
+      Snapshot
+    </Stat>
+  );
+}
+
+export function FxSource() {
+  const fx = useFx();
+  return (
+    <>
+      CeylonCash FX · {fxDate(fx)} <FxBadge />
+    </>
   );
 }
 
@@ -196,7 +271,7 @@ export function Legal() {
       <b className="font-medium text-fg">{CFG.reg_status}</b>
       <br />
       Digital assets are not legal tender in Sri Lanka, are not issued or guaranteed by the Central Bank of Sri Lanka, and can
-      lose value. CeyPay does not give investment advice.{" "}
+      lose value.{" "}
       <Link className={a} href={infoUrl("safety")}>
         Safety
       </Link>{" "}
@@ -206,109 +281,10 @@ export function Legal() {
       </Link>{" "}
       ·{" "}
       <Link className={a} href={infoUrl("faq")}>
-        Help &amp; complaints
+        Help
       </Link>
     </div>
   );
-}
-
-/* ---------- domain bits ---------- */
-
-const XL_BG: Record<Provider, string> = { binance: "bg-[#F0B90B]", bybit: "bg-[#F7A600]", kucoin: "bg-[#23AF91]" };
-const XL_SIZE = { sm: "size-[22px] rounded-md text-[11px]", md: "size-[30px] rounded-lg text-[13px]", lg: "size-10 rounded-xl text-[17px]" };
-
-/** Exchange badge. */
-export function Xl({ p, size = "sm", className }: { p: Provider; size?: keyof typeof XL_SIZE; className?: string }) {
-  return (
-    <i className={cn("grid flex-none place-items-center font-bold text-black not-italic", XL_BG[p], XL_SIZE[size], className)}>
-      {(PNAME[p] || "?")[0]}
-    </i>
-  );
-}
-
-/** List row (transfers, payees, accounts). Add `listRowAction` when it's tappable. */
-export const listRow =
-  "flex w-full items-center gap-3 border-b border-line-subtle px-1 py-3 text-left last:border-b-0 [&_b]:block [&_b]:font-medium [&_b]:text-ink [&_small]:text-muted";
-export const listRowAction = "hover:bg-glass-subtle";
-export const listRowEnd = "ml-auto flex flex-col items-end gap-1 text-right";
-
-export function TxRow({ t }: { t: Tx }) {
-  const router = useRouter();
-  return (
-    <button className={cn(listRow, listRowAction)} onClick={() => router.push(`/transfer/${t.id}`)}>
-      <Avatar>{t.kind === "sell" ? <ArrowDown size={16} /> : <ArrowUpRight size={16} />}</Avatar>
-      <div>
-        <b>{t.kind === "sell" ? "Sold USDT" : "To " + (t.payee.nickname || t.payee.name)}</b>
-        <small>
-          {new Date(t.created).toLocaleDateString(undefined, { day: "numeric", month: "short" })} · {fmt(t.gross_usdt)} USDT
-        </small>
-      </div>
-      <div className={listRowEnd}>
-        <b className="font-mono">{lkr(t.lkr_out || t.quoted_lkr)}</b>
-        <Stat tone={t.state}>{stLabel(t.state)}</Stat>
-      </div>
-    </button>
-  );
-}
-
-/* ---------- forms ---------- */
-
-export function Field({ id, label, error, children, className }: { id?: string; label: ReactNode; error?: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("mt-3.5", className)}>
-      <label htmlFor={id} className="mb-1.5 block text-[12.5px] text-muted">
-        {label}
-      </label>
-      {children}
-      {error ? <div className="mt-[5px] text-[12.5px] text-err">{error}</div> : null}
-    </div>
-  );
-}
-
-export function Checkbox({ checked, onChange, children, className }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode; className?: string }) {
-  return (
-    <label className={cn("mt-3.5 flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-normal text-fg", className)}>
-      <input
-        type="checkbox"
-        className="mt-[3px] size-[17px] flex-none accent-brand"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>{children}</span>
-    </label>
-  );
-}
-
-/** Focus the first field with an error. Returns true when there are none. */
-export function validate(errs: Record<string, string>) {
-  const bad = Object.keys(errs).find((k) => errs[k]);
-  if (bad) document.getElementById(bad)?.focus();
-  return !bad;
-}
-
-/** Two-tap destructive button: first tap arms it for 2.5s. */
-export function ConfirmButton({ label, armedLabel, onConfirm, ...p }: { label: string; armedLabel: string; onConfirm: () => void; className?: string } & ButtonVariants) {
-  const [armed, setArmed] = useState(false);
-  useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 2500);
-    return () => clearTimeout(t);
-  }, [armed]);
-  return (
-    <Button {...p} onClick={() => (armed ? onConfirm() : setArmed(true))}>
-      {armed ? armedLabel : label}
-    </Button>
-  );
-}
-
-/** Re-render every `ms`. Returns the current timestamp. */
-export function useNow(ms: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(id);
-  }, [ms]);
-  return now;
 }
 
 export function RiskNote() {
@@ -324,4 +300,462 @@ export function RiskNote() {
       </span>
     </div>
   );
+}
+
+/* ---------- logos ---------- */
+
+const PM_CLS: Record<string, string> = {
+  visa: "bg-[#1a1f71] text-white",
+  mastercard: "border border-[#444] bg-[#252525] text-[#f7a21b]",
+  amex: "bg-[#2e77bc] text-white",
+  binance: "bg-[#F0B90B] text-[#111]",
+  bybit: "border border-[#333] bg-[#111] text-[#F7A600]",
+  kucoin: "bg-[#23AF91] text-white",
+  justpay: "bg-[#0b3d91] text-white",
+};
+const pmBase = "inline-grid h-[22px] min-w-[34px] flex-none place-items-center rounded-[5px] px-[5px] text-[10px] font-bold tracking-[.3px]";
+
+/** Small brand chip: a card network, an exchange, or JustPay. */
+export function Pmi({ k, children, className }: { k: string; children: ReactNode; className?: string }) {
+  return <span className={cn(pmBase, PM_CLS[k], className)}>{children}</span>;
+}
+
+export function PmIcon({ m, className }: { m: Method | undefined | null; className?: string }) {
+  if (!m)
+    return (
+      <span className={cn(pmBase, "bg-line", className)}>—</span>
+    );
+  if (m.type === "card")
+    return (
+      <Pmi k={m.brand} className={className}>
+        {{ visa: "VISA", mastercard: "MC", amex: "AMEX" }[m.brand]}
+      </Pmi>
+    );
+  if (m.type === "justpay")
+    return (
+      <Pmi k="justpay" className={className}>
+        JP
+      </Pmi>
+    );
+  return (
+    <Pmi k={m.provider} className={className}>
+      {PNAME[m.provider][0]}
+    </Pmi>
+  );
+}
+
+const BILLER_COLORS: Record<string, [string, string]> = {
+  CEB: ["#f6a800", "#1a1300"],
+  LECO: ["#e2231a", "#fff"],
+  NWSDB: ["#0072bc", "#fff"],
+  SLT: ["#1c3f94", "#fff"],
+  Dialog: ["#ec1c24", "#fff"],
+  DIALOG_PP: ["#ec1c24", "#fff"],
+  DIALOGTV: ["#ec1c24", "#fff"],
+  Mobitel: ["#009a44", "#fff"],
+  Hutch: ["#ff6a13", "#fff"],
+  Airtel: ["#e40000", "#fff"],
+  AIA: ["#d31145", "#fff"],
+};
+
+/** Counterparty logo: generated initials for people, brand colours for billers. */
+export function CpLogo({ cp, big }: { cp: Counterparty | { kind: "person"; name: string }; big?: boolean }) {
+  const cls = big
+    ? "mx-auto mb-3.5 grid size-[76px] place-items-center rounded-[22px] text-2xl font-semibold shadow-[0_0_0_1px_var(--line)] [&_svg]:size-[34px]"
+    : "grid size-8 flex-none place-items-center overflow-hidden rounded-[9px] text-xs font-bold [&_svg]:size-[18px]";
+  if (cp.kind === "sell")
+    return (
+      <span className={cn(cls, "bg-brand-soft text-brand")}>
+        <SellGlyph />
+      </span>
+    );
+  if (cp.kind === "person") {
+    const h = hue(cp.name);
+    return (
+      <span className={cn(cls, "rounded-full")} style={{ background: `hsl(${h} 60% 50% / .18)`, color: `hsl(${h} 70% 62%)` }}>
+        {initials(cp.name)}
+      </span>
+    );
+  }
+  const code = "code" in cp ? cp.code : undefined;
+  const [bg, fg] = (code && BILLER_COLORS[code]) || [`hsl(${hue(cp.name)} 45% 40%)`, "#fff"];
+  return (
+    <span className={cls} style={{ background: bg, color: fg }}>
+      {(code || cp.name).slice(0, 3).replace("_", "")}
+    </span>
+  );
+}
+
+const SellGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 4v12M6 10l6 6 6-6M5 20h14" />
+  </svg>
+);
+
+/* ---------- card visuals ---------- */
+
+const CV_BG: Record<string, string> = {
+  card: "linear-gradient(135deg,#0d0d0d,#2a2a2a)",
+  visa: "linear-gradient(135deg,#10195c,#2b3aa8)",
+  binance: "linear-gradient(135deg,#1e1a08,#6b5302)",
+  bybit: "linear-gradient(135deg,#0f0f0f,#3a2a05)",
+  kucoin: "linear-gradient(135deg,#052a22,#157a64)",
+  justpay: "linear-gradient(135deg,#061a44,#1C6EF5)",
+};
+
+/** Credit-card-shaped picture of a payment method. */
+export function CardVisual({ m, db, number }: { m: Method; db: DB; number?: string }) {
+  const bg = m.type === "card" ? (m.brand === "visa" ? CV_BG.visa : CV_BG.card) : m.type === "justpay" ? CV_BG.justpay : CV_BG[m.provider];
+  let top: [ReactNode, ReactNode], num: ReactNode, left: ReactNode, brand: ReactNode;
+  if (m.type === "card") {
+    top = [m.issuer, m.funding];
+    num = number ?? `•••• •••• •••• ${m.last4}`;
+    left = (
+      <>
+        {m.holder}
+        <br />
+        {m.exp}
+      </>
+    );
+    brand = { visa: "VISA", mastercard: "mastercard", amex: "AMEX" }[m.brand];
+  } else if (m.type === "justpay") {
+    top = [m.bank, "JustPay"];
+    num = `•••• ${m.last4}`;
+    left = (
+      <>
+        {db.user?.name}
+        <br />
+        {phone(m.mobile)}
+      </>
+    );
+    brand = <span className="text-[15px]">LankaClear</span>;
+  } else {
+    top = ["CeyPay Direct Debit", "USDT"];
+    num = m.label;
+    left = (
+      <>
+        Up to {m.per_txn_limit} USDT / transfer
+        <br />
+        {fmt(spentBy(db, m.id, 30), 0)} / {m.monthly_limit} this month
+      </>
+    );
+    brand = PNAME[m.provider];
+  }
+  return (
+    <div
+      className={cn(
+        "relative mx-auto mb-[18px] flex aspect-[1.586] w-[300px] max-w-full flex-col justify-between overflow-hidden rounded-[18px] px-5 py-[18px] text-left text-white shadow-[0_24px_48px_-18px_rgba(0,0,0,.6)]",
+        "after:pointer-events-none after:absolute after:inset-0 after:bg-[radial-gradient(120%_80%_at_100%_0%,rgba(255,255,255,.18),transparent_55%)]",
+        isExpired(m) && "brightness-[.8] grayscale-[.6]",
+      )}
+      style={{ background: bg }}
+    >
+      <div className="flex items-start justify-between text-[13px] opacity-90">
+        <span>{top[0]}</span>
+        <span>{top[1]}</span>
+      </div>
+      <div className="font-mono text-[17px] tracking-[2px]">{num}</div>
+      <div className="flex items-end justify-between text-xs">
+        <span>{left}</span>
+        <span className="text-lg font-extrabold tracking-[.5px]">{brand}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- master / detail ---------- */
+
+/** List on the left, sticky detail pane on the right. Phones show one or the other. */
+export function MasterDetail({ selected, list, detail, placeholder }: { selected: boolean; list: ReactNode; detail: ReactNode; placeholder: string }) {
+  return (
+    <div className="grid min-h-0 grid-cols-1 md:min-h-[calc(100vh-76px)] md:grid-cols-[minmax(0,1fr)_340px] lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_440px]">
+      <div className={cn("min-w-0 px-1.5 pt-1 pb-5 md:px-3 md:pb-10", selected && "max-md:hidden")}>{list}</div>
+      <aside
+        className={cn(
+          "px-4 pt-[22px] pb-[30px] md:sticky md:top-[76px] md:h-[calc(100vh-76px)] md:overflow-auto md:border-l md:border-line-subtle md:px-7 md:pt-[34px] md:pb-10",
+          !selected && "max-md:hidden",
+        )}
+      >
+        {selected ? detail : <div className="grid h-full place-items-center text-center text-sm text-muted">{placeholder}</div>}
+      </aside>
+    </div>
+  );
+}
+
+export const ListGroup = ({ children }: { children: ReactNode }) => <div className="px-4 pt-[18px] pb-1.5 text-[13px] text-muted">{children}</div>;
+
+const LROW_COLS = {
+  /** Logo, name, method, date, amount. */
+  full: "grid-cols-[34px_minmax(0,1fr)_auto] md:grid-cols-[34px_minmax(0,1.5fr)_minmax(0,1fr)_max-content] xl:grid-cols-[34px_minmax(0,1.5fr)_minmax(0,1.1fr)_118px_minmax(170px,max-content)]",
+  /** Logo, name, next date, amount. */
+  r4: "grid-cols-[34px_minmax(0,1fr)_auto] md:grid-cols-[34px_minmax(0,1fr)_130px] xl:grid-cols-[34px_minmax(0,1.5fr)_140px_160px]",
+  /** Logo, name + sub, end. */
+  w3: "grid-cols-[34px_minmax(0,1fr)_auto]",
+};
+
+/** Row in a master list. `sub` shows under the name on phones (always, for `w3`). */
+export function LRow({
+  logo,
+  title,
+  sub,
+  c2,
+  c3,
+  end,
+  variant = "full",
+  selected,
+  href,
+  onClick,
+  as,
+  className,
+}: {
+  logo: ReactNode;
+  title: ReactNode;
+  sub?: ReactNode;
+  c2?: ReactNode;
+  c3?: ReactNode;
+  end?: ReactNode;
+  variant?: keyof typeof LROW_COLS;
+  selected?: boolean;
+  href?: string;
+  onClick?: () => void;
+  /** Static row, for rows that hold their own controls. */
+  as?: "div";
+  className?: string;
+}) {
+  const cls = cn(
+    "grid w-full items-center gap-3.5 rounded-xl px-2.5 py-[11px] text-left text-[15px] text-fg hover:bg-glass-subtle md:px-4 [&+&]:shadow-[0_-1px_0_var(--line-subtle)]",
+    LROW_COLS[variant],
+    selected && "bg-glass shadow-[inset_0_0_0_1px_var(--line)]! hover:bg-glass",
+    className,
+  );
+  const body = (
+    <>
+      {logo}
+      <div className="min-w-0">
+        <div className="truncate text-ink">{title}</div>
+        {sub != null && <div className={cn("truncate text-[12.5px] text-muted", variant !== "w3" && "md:hidden")}>{sub}</div>}
+      </div>
+      {variant !== "w3" && c2 != null && <div className={cn("truncate text-muted", variant === "full" ? "max-md:hidden" : "max-xl:hidden")}>{c2}</div>}
+      {variant === "full" && c3 != null && <div className="truncate text-muted max-xl:hidden">{c3}</div>}
+      <div className="text-right font-mono text-[14.5px] whitespace-nowrap text-ink">{end}</div>
+    </>
+  );
+  if (as === "div") return <div className={cn(cls, "hover:bg-transparent")}>{body}</div>;
+  return href ? (
+    <Link className={cls} href={href} aria-current={selected ? "true" : undefined}>
+      {body}
+    </Link>
+  ) : (
+    <button className={cls} onClick={onClick} aria-current={selected ? "true" : undefined}>
+      {body}
+    </button>
+  );
+}
+
+/* ---------- detail pane ---------- */
+
+export function DetailHead({ logo, title, sub, big, onRename }: { logo: ReactNode; title: ReactNode; sub?: ReactNode; big?: ReactNode; onRename?: () => void }) {
+  return (
+    <div className="text-center">
+      {logo}
+      <div className="flex items-center justify-center gap-2 text-[22px] font-medium tracking-[-.4px] text-ink">
+        {title}
+        {onRename && (
+          <button className="p-1 text-muted" onClick={onRename} aria-label="Rename">
+            <Pencil size={16} />
+          </button>
+        )}
+      </div>
+      {sub && <div className="mt-1 text-sm text-muted">{sub}</div>}
+      {big && <div className="mt-2 font-mono text-[30px] tracking-[-.5px] text-ink">{big}</div>}
+    </div>
+  );
+}
+
+export function DCard({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("mt-4 rounded-2xl border border-line bg-glass-subtle px-[18px] py-0.5", className)}>{children}</div>;
+}
+
+export function DRow({ label, children, strong }: { label: ReactNode; children: ReactNode; strong?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3.5 py-3 text-[14.5px] [&+&]:border-t [&+&]:border-line-subtle">
+      <span className="text-fg">{label}</span>
+      <b className={cn("text-right font-normal", strong ? "text-ink" : "text-muted")}>{children}</b>
+    </div>
+  );
+}
+
+const InGroup = createContext(false);
+
+/** Grouped detail actions share one rounded box. */
+export function DGroup({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-2.5 overflow-hidden rounded-[14px] border border-line-subtle bg-glass-subtle">
+      <InGroup.Provider value={true}>{children}</InGroup.Provider>
+    </div>
+  );
+}
+
+/** Detail-pane action row: icon, label, optional value on the right. */
+export function DAct({
+  icon,
+  children,
+  right,
+  chevron,
+  danger,
+  href,
+  onClick,
+  id,
+  as,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  right?: ReactNode;
+  chevron?: boolean;
+  danger?: boolean;
+  href?: string;
+  onClick?: () => void;
+  id?: string;
+  /** Render as a plain row (no button), e.g. when `right` holds a control. */
+  as?: "div";
+}) {
+  const grouped = useContext(InGroup);
+  const cls = cn(
+    "flex w-full items-center gap-3 px-[18px] py-3.5 text-left text-[15px] text-ink [&>svg]:size-5 [&>svg]:flex-none [&>svg]:text-fg",
+    grouped
+      ? "[&+&]:border-t [&+&]:border-line-subtle"
+      : "mt-2.5 rounded-[14px] border border-line-subtle bg-glass-subtle hover:border-line",
+    danger && "text-err [&>svg]:text-err",
+  );
+  const body = (
+    <>
+      {icon}
+      {children}
+      {(right != null || chevron) && (
+        <span className="ml-auto flex items-center gap-2 text-sm text-muted">
+          {right}
+          {chevron && <ChevronRight size={16} />}
+        </span>
+      )}
+    </>
+  );
+  if (as === "div") return <div className={cls}>{body}</div>;
+  if (href)
+    return (
+      <Link className={cls} href={href} id={id}>
+        {body}
+      </Link>
+    );
+  return (
+    <button className={cls} onClick={onClick} id={id}>
+      {body}
+    </button>
+  );
+}
+
+/** Inline alert with an optional action button. */
+export function Alert({ children, action, tone = "err", className }: { children: ReactNode; action?: ReactNode; tone?: "err" | "warn"; className?: string }) {
+  return (
+    <div className={cn("mt-4 flex items-center gap-3 rounded-[14px] border border-line px-3.5 py-3 text-sm text-ink", className)}>
+      <span className={cn("grid size-[34px] flex-none place-items-center rounded-[10px] font-bold", tone === "err" ? "bg-err-soft text-err" : "bg-warn-soft text-warn")}>!</span>
+      <div>{children}</div>
+      {action && <div className="ml-auto flex-none">{action}</div>}
+    </div>
+  );
+}
+
+export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: () => void; disabled?: boolean; label: string }) {
+  return (
+    <button
+      className={cn(
+        "relative h-6 w-10 flex-none rounded-full bg-line disabled:opacity-50",
+        "after:absolute after:top-[3px] after:left-[3px] after:size-[18px] after:rounded-full after:bg-white after:transition-[left] after:duration-150",
+        on && "bg-brand after:left-[19px]",
+      )}
+      onClick={onChange}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={on}
+    />
+  );
+}
+
+/* ---------- forms ---------- */
+
+export function Field({ id, label, error, hint, children, className }: { id?: string; label: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("mt-3.5", className)}>
+      <label htmlFor={id} className="mb-1.5 block text-[12.5px] text-muted">
+        {label}
+      </label>
+      {children}
+      {error ? <div className="mt-[5px] text-[12.5px] text-err">{error}</div> : null}
+      {hint ? <div className={cn(fine, "mt-[5px]")}>{hint}</div> : null}
+    </div>
+  );
+}
+
+export function Checkbox({ checked, onChange, children, className }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode; className?: string }) {
+  return (
+    <label className={cn("mt-3.5 flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-normal text-fg", className)}>
+      <input type="checkbox" className="mt-[3px] size-[17px] flex-none accent-brand" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>{children}</span>
+    </label>
+  );
+}
+
+/** Focus the first field with an error. Returns true when there are none. */
+export function validate(errs: Record<string, string>) {
+  const bad = Object.keys(errs).find((k) => errs[k]);
+  if (bad) document.getElementById(bad)?.focus();
+  return !bad;
+}
+
+/** Field errors that clear as soon as the field is edited. */
+export function useErrors<K extends string>(keys: readonly K[]) {
+  const blank = () => Object.fromEntries(keys.map((k) => [k, ""])) as Record<K, string>;
+  const [errs, setErrs] = useState(blank);
+  const clear = (k: K) => errs[k] && setErrs((e) => ({ ...e, [k]: "" }));
+  const check = (next: Record<K, string>) => {
+    setErrs(next);
+    return validate(next);
+  };
+  return { errs, clear, check };
+}
+
+/** Two-tap destructive action: the first tap arms it for 2.5s. Returns [armed, tap]. */
+export function useArmed(onConfirm: () => void): [boolean, () => void] {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 2500);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return [armed, () => (armed ? onConfirm() : setArmed(true))];
+}
+
+export function ConfirmButton({ label, armedLabel, onConfirm, ...p }: { label: ReactNode; armedLabel: string; onConfirm: () => void; className?: string } & ButtonVariants) {
+  const [armed, tap] = useArmed(onConfirm);
+  return (
+    <Button {...p} onClick={tap}>
+      {armed ? armedLabel : label}
+    </Button>
+  );
+}
+
+/** Re-render every `ms`. Returns the current timestamp. */
+export function useNow(ms: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}
+
+/** Back target from `?ret=`, falling back to `fallback`. */
+export function useBack(ret: string | null, fallback: string) {
+  const router = useRouter();
+  const to = ret && ret.startsWith("/") && !ret.startsWith("//") ? ret : fallback;
+  return { to, go: () => router.push(to) };
 }

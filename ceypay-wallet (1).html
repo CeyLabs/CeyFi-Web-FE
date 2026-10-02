@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CeyPay</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* CeyPay design tokens: from ceypay.io (Geist, #1C6EF5, glass cards r24, buttons r8) */
+:root{
+  --blue:#1C6EF5; --blue-2:#3d86ff; --blue-soft:rgba(28,110,245,.14);
+  --bg:#000; --bg-2:#0a0a0a; --glass:rgba(255,255,255,.05); --glass-2:rgba(255,255,255,.035); --line:rgba(255,255,255,.15); --line-2:rgba(255,255,255,.1);
+  --ink:#fff; --text:#d4d4d8; --muted:#a1a1aa; --field:rgba(255,255,255,.06);
+  --ok:#34d399; --okS:rgba(52,211,153,.12); --err:#f87171; --errS:rgba(248,113,113,.12); --warn:#fbbf24; --warnS:rgba(251,191,36,.12);
+  --h-grad:linear-gradient(#fff,#fff,rgba(255,255,255,.6)); --h2-grad:linear-gradient(to right,#fff 0%,rgba(255,255,255,.3) 100%);
+  --glow:radial-gradient(60% 50% at 50% 0%,rgba(28,110,245,.35),transparent 70%);
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#fff; --bg-2:#f6f7f9; --glass:#f7f8fa; --glass-2:#fafbfc; --line:#e4e4e7; --line-2:#ececef; --ink:#09090b; --text:#3f3f46; --muted:#71717a; --field:#fff;
+  --ok:#059669; --okS:#ecfdf5; --err:#dc2626; --errS:#fef2f2; --warn:#b45309; --warnS:#fffbeb;
+  --h-grad:linear-gradient(#09090b,#09090b,rgba(9,9,11,.65)); --h2-grad:linear-gradient(to right,#09090b 0%,rgba(9,9,11,.45) 100%);
+  --glow:radial-gradient(60% 50% at 50% 0%,rgba(28,110,245,.16),transparent 70%);
+}}
+:root[data-theme="light"]{
+  --bg:#fff; --bg-2:#f6f7f9; --glass:#f7f8fa; --glass-2:#fafbfc; --line:#e4e4e7; --line-2:#ececef; --ink:#09090b; --text:#3f3f46; --muted:#71717a; --field:#fff;
+  --ok:#059669; --okS:#ecfdf5; --err:#dc2626; --errS:#fef2f2; --warn:#b45309; --warnS:#fffbeb;
+  --h-grad:linear-gradient(#09090b,#09090b,rgba(9,9,11,.65)); --h2-grad:linear-gradient(to right,#09090b 0%,rgba(9,9,11,.45) 100%);
+  --glow:radial-gradient(60% 50% at 50% 0%,rgba(28,110,245,.16),transparent 70%);
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Geist,system-ui,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.hidden{display:none!important}
+.sandbar{font-family:'Geist Mono',monospace;font-size:11.5px;text-align:center;padding:6px 16px;background:var(--warnS);color:var(--warn);letter-spacing:.3px}
+
+/* nav: floating glass bar */
+.navw{position:sticky;top:10px;z-index:30;padding:0 12px}
+nav{max-width:1120px;margin:10px auto 0;display:flex;align-items:center;gap:22px;padding:8px 8px 8px 16px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(12px)}
+.logo{display:flex;align-items:center;color:var(--ink)} .logo img,.logo svg{height:26px;width:auto;display:block}
+.links{display:flex;gap:22px;font-size:14px;color:var(--text)} .links a:hover{color:var(--ink)}
+.sp{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:8px;border:0;background:var(--blue);color:#fff;font-weight:500;font-size:14px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--blue-2)} .btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:var(--glass);border:1px solid var(--line);color:var(--ink)} .btn.ghost:hover{background:var(--line-2)}
+.btn.lg{height:52px;font-size:16px;border-radius:12px;width:100%}
+.btn.sm{height:30px;padding:0 10px;font-size:13px}
+#userBtn{display:flex;align-items:center}
+@media (max-width:860px){.links{display:none}}
+@media (max-width:520px){.big{font-size:19px;padding-right:128px}.det{max-width:118px}.chips{grid-template-columns:repeat(3,1fr)}}
+
+/* hero */
+.hero{position:relative;padding:64px 0 40px;text-align:center;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:var(--glow);pointer-events:none}
+.pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--glass);border-radius:99px;padding:4px 12px 4px 4px;font-size:12.5px;color:var(--text)}
+.pill b{background:var(--blue);color:#fff;border-radius:99px;padding:2px 9px;font-weight:500;font-size:11.5px}
+h1{font-weight:500;font-size:clamp(34px,6vw,60px);line-height:1.05;letter-spacing:-1.8px;margin:18px 0 12px;color:var(--ink)}
+h1 span{display:block;background:var(--h-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 span+span{opacity:.75}
+.lead{max-width:560px;margin:0 auto;color:var(--muted);font-size:16.5px;line-height:1.55}
+
+/* composer */
+.composer{position:relative;max-width:640px;margin:28px auto 0;text-align:left;background:var(--glass);border:1px solid var(--line);border-radius:24px;padding:18px;backdrop-filter:blur(8px)}
+.recents{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.recents::-webkit-scrollbar{display:none}
+.rc{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--glass-2);border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer}
+.rc:hover{border-color:var(--blue)} .rc i{font-style:normal;color:var(--muted)}
+.inrow{position:relative}
+.big{width:100%;height:64px;border-radius:14px;border:1px solid var(--line);background:var(--field);color:var(--ink);font:inherit;font-size:22px;letter-spacing:.5px;padding:0 150px 0 18px;font-family:'Geist Mono',monospace}
+.big::placeholder{font-family:Geist,sans-serif;letter-spacing:0;font-size:17px;color:var(--muted)}
+.big:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}
+.det{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:6px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--glass);font-size:13.5px;font-weight:500;color:var(--ink);cursor:pointer;max-width:140px}
+.det span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.det .dotc{width:8px;height:8px;border-radius:50%;background:var(--blue);flex:none}
+.det.none{color:var(--muted)} .det.none .dotc{background:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted);margin:8px 2px 0;min-height:18px}
+.seg{display:inline-grid;grid-auto-flow:column;gap:2px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:3px;margin-top:14px}
+.seg button{border:0;background:none;border-radius:7px;padding:7px 14px;font-size:13.5px;font-weight:500;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--blue);color:#fff}
+.chips{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+.chip{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--glass-2);font-weight:500;cursor:pointer;font-family:'Geist Mono',monospace;font-size:14px}
+.chip.on{border-color:var(--blue);background:var(--blue-soft);color:var(--ink)}
+.amtrow{display:flex;gap:10px;align-items:center;margin-top:12px}
+.amt{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-family:'Geist Mono',monospace;font-size:18px;padding:0 14px 0 56px}
+.amt:focus{outline:none;border-color:var(--blue)}
+.amtw{position:relative;flex:1} .amtw::before{content:"LKR";position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;font-family:'Geist Mono',monospace}
+.duebox{margin-top:14px;border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;background:var(--glass-2);display:flex;justify-content:space-between;gap:12px;align-items:center}
+.duebox small{color:var(--muted);display:block} .duebox b{color:var(--ink);font-weight:500}
+.skel{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--line-2),var(--line),var(--line-2));background-size:200% 100%;animation:sk 1.2s infinite;width:140px}
+@keyframes sk{to{background-position:-200% 0}}
+.payrow{margin-top:16px}
+.payvia{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--muted)}
+.payvia a{color:var(--blue);cursor:pointer}
+.err{margin-top:10px;border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--errS);color:var(--err)}
+
+/* sections */
+section.s{padding:72px 0}
+h2{font-weight:400;font-size:clamp(26px,3.6vw,36px);letter-spacing:-1.8px;margin:0 0 8px;background:var(--h2-grad);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.15}
+.sub{color:var(--muted);margin:0 0 28px;font-size:16px;max-width:620px;line-height:1.5}
+.grid{display:grid;gap:12px}
+.cats{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:24px;padding:20px}
+.card.c2{background:var(--glass-2);border-color:var(--line-2)}
+.cat{cursor:pointer;text-align:left;transition:border-color .15s} .cat:hover{border-color:var(--blue)}
+.cat svg{width:26px;height:26px;color:var(--blue);margin-bottom:14px}
+.cat b{display:block;color:var(--ink);font-weight:500} .cat small{display:block;color:var(--muted);font-size:12.5px;margin-top:4px;line-height:1.45}
+.bento{grid-template-columns:repeat(3,1fr)} @media (max-width:820px){.bento{grid-template-columns:1fr}}
+.bento .card b{display:block;color:var(--ink);font-weight:500;font-size:17px;margin-bottom:6px}
+.bento .card p{margin:0;color:var(--muted);line-height:1.55}
+.span2{grid-column:span 2} @media (max-width:820px){.span2{grid-column:auto}}
+.xrow{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.xb{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:500;color:var(--ink);background:var(--glass-2)}
+.xl{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:700;color:#000;flex:none}
+.xl.binance{background:#F0B90B}.xl.bybit{background:#F7A600}.xl.kucoin{background:#23AF91}
+.steps3{grid-template-columns:repeat(3,1fr)} @media (max-width:760px){.steps3{grid-template-columns:1fr}}
+.n{font-family:'Geist Mono',monospace;color:var(--blue);font-size:13px;margin-bottom:10px}
+.faq details{border-bottom:1px solid var(--line-2);padding:16px 0}
+.faq summary{cursor:pointer;color:var(--ink);font-weight:500;font-size:16px;list-style:none;display:flex;justify-content:space-between}
+.faq summary::after{content:"+";color:var(--muted)} .faq details[open] summary::after{content:"–"}
+.faq p{color:var(--muted);line-height:1.6;margin:10px 0 0}
+footer{border-top:1px solid var(--line-2);padding:40px 0 30px;font-size:13.5px;color:var(--muted)}
+.fgrid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:24px} @media (max-width:760px){.fgrid{grid-template-columns:1fr 1fr}}
+footer h4{color:var(--ink);font-weight:500;margin:0 0 10px;font-size:14px} footer a{display:block;margin:7px 0} footer a:hover{color:var(--ink)}
+
+/* sheet */
+.ov{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:48px 14px}
+.ov.on{display:flex}
+.sheet{width:100%;max-width:480px;background:var(--bg-2);border:1px solid var(--line);border-radius:24px;padding:22px;position:relative;color:var(--text)}
+@media (max-width:520px){.ov{padding:0;align-items:flex-end}.sheet{border-radius:24px 24px 0 0;max-height:92vh;overflow:auto}}
+.x{position:absolute;right:14px;top:14px;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--glass);cursor:pointer}
+.sh{color:var(--ink);font-size:19px;font-weight:500;margin:0 40px 4px 0;letter-spacing:-.4px}
+.shs{color:var(--muted);font-size:13.5px;margin:0 0 16px;line-height:1.5}
+label.l{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 6px}
+.f{width:100%;height:46px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--ink);font:inherit;font-size:15px;padding:0 12px}
+.f:focus{outline:none;border-color:var(--blue)}
+.opt{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--glass-2);cursor:pointer;margin-top:8px;width:100%;text-align:left}
+.opt:hover{border-color:var(--blue)} .opt.on{border-color:var(--blue);background:var(--blue-soft)} .opt.dis{opacity:.5;cursor:not-allowed}
+.opt b{display:block;color:var(--ink);font-weight:500} .opt small{color:var(--muted)} .opt .r{margin-left:auto;text-align:right;font-size:13px;white-space:nowrap}
+.ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--blue-soft);color:var(--blue);font-weight:600;font-size:12px;flex:none}
+.grp{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:18px 0 2px;font-family:'Geist Mono',monospace}
+.sum{border:1px solid var(--line-2);border-radius:14px;padding:10px 14px;margin-top:12px;background:var(--glass-2)}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:14px} .sum b{color:var(--ink);font-weight:500;text-align:right}
+.sum .tot{border-top:1px solid var(--line-2);margin-top:6px;padding-top:10px;font-size:16px}
+.stat{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:99px;font-family:'Geist Mono',monospace}
+.st-active{background:var(--okS);color:var(--ok)} .st-pending_authorization{background:var(--warnS);color:var(--warn)} .st-rejected_duplicate,.st-expired{background:var(--errS);color:var(--err)}
+.bar{height:5px;border-radius:5px;background:var(--line-2);margin-top:8px;overflow:hidden} .bar i{display:block;height:100%;background:var(--blue)}
+.acc{border:1px solid var(--line);border-radius:16px;padding:14px;background:var(--glass-2);margin-top:10px}
+.acc .top{display:flex;align-items:center;gap:10px} .acc .top b{color:var(--ink);font-weight:500}
+.acc .meta{font-size:12.5px;color:var(--muted);margin-top:8px;display:flex;justify-content:space-between}
+.acc .acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.xgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.xpick{border:1px solid var(--line);border-radius:14px;padding:14px 8px;background:var(--glass-2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ink);font-weight:500}
+.xpick.on{border-color:var(--blue);background:var(--blue-soft)} .xpick .xl{width:30px;height:30px;font-size:13px;border-radius:8px}
+.prog{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.pst{display:flex;gap:10px;align-items:center;color:var(--ink)}
+.dt{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;flex:none}
+.dt.done{background:var(--ok);border-color:var(--ok);color:#000} .dt.run{border-color:var(--blue);border-top-color:transparent;animation:spin 1s linear infinite} .dt.fail{background:var(--err);border-color:var(--err);color:#000}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tick{width:64px;height:64px;border-radius:50%;background:var(--okS);color:var(--ok);display:grid;place-items:center;font-size:30px;margin:8px auto}
+.amtbig{text-align:center;font-size:36px;color:var(--ink);font-weight:500;letter-spacing:-1px;font-family:'Geist Mono',monospace}
+.qr{background:#fff;padding:12px;border-radius:12px;width:max-content;margin:12px auto}
+.search{position:relative;margin-bottom:6px}
+.list{max-height:56vh;overflow:auto}
+
+/* ============ shell ============ */
+body{min-height:100vh;background:var(--bg)}
+.app{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:22px 14px 14px;border-right:1px solid var(--line-2);background:var(--bg-2)}
+.side .lg{padding:0 10px 22px;display:flex;align-items:center;gap:10px}
+.side .lg svg{height:26px;width:auto;color:var(--ink)}
+.nv{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px;color:var(--text);font-size:15px;position:relative}
+.nv svg{width:20px;height:20px;flex:none}
+.nv:hover{background:var(--glass-2);color:var(--ink)}
+.nv[aria-current="page"]{background:var(--glass);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.nv .dot{position:absolute;right:12px;width:7px;height:7px;border-radius:50%;background:var(--err)}
+.sgrp{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-family:'Geist Mono',monospace;padding:18px 12px 6px}
+.soon{font-family:'Geist Mono',monospace;font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;padding:2px 6px;border-radius:99px;background:var(--warnS);color:var(--warn)}
+.side .sp{flex:1}
+.meb{display:flex;align-items:center;gap:12px;padding:14px 10px 4px;border-top:1px solid var(--line-2);margin-top:10px;border-radius:0;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;cursor:pointer;width:100%}
+.meb b{display:block;color:var(--ink);font-weight:500;font-size:14.5px} .meb small{color:var(--muted);font-size:12.5px;display:block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avt{width:40px;height:40px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:600;flex:none}
+.demo{font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.5px;padding:3px 7px;border-radius:99px;background:var(--warnS);color:var(--warn)}
+main{min-width:0}
+.phead{height:76px;display:flex;align-items:center;gap:12px;padding:0 28px;border-bottom:1px solid var(--line-2);position:sticky;top:0;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);z-index:6}
+.phead h1{font-size:24px;letter-spacing:-.5px;margin:0;font-weight:500;color:var(--ink)}
+.phead .sp{flex:1}
+.ib{width:38px;height:38px;border-radius:10px;border:1px solid transparent;background:none;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:var(--glass);border-color:var(--line)} .ib svg{width:20px;height:20px}
+.back{display:none}
+.pad{padding:24px 28px 60px}
+.col{max-width:560px}
+.fine{font-size:12.5px;color:var(--muted);line-height:1.5}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:90;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+
+/* ============ master / detail ============ */
+.md{display:grid;grid-template-columns:minmax(0,1fr) 440px;min-height:calc(100vh - 76px)}
+.md .list{padding:4px 12px 40px;min-width:0}
+.lgrp{padding:18px 16px 6px;font-size:13px;color:var(--muted)}
+.lrow{display:grid;grid-template-columns:34px minmax(0,1.5fr) minmax(0,1.1fr) 118px 170px;gap:14px;align-items:center;padding:11px 16px;border-radius:12px;cursor:pointer;width:100%;text-align:left;background:none;border:0;color:var(--text);font-size:15px}
+.lrow+.lrow{box-shadow:0 -1px 0 var(--line-2)} .lrow.sel+.lrow,.lrow:hover+.lrow{box-shadow:none}
+.lrow:hover{background:var(--glass-2)} .lrow.sel{background:var(--glass);box-shadow:inset 0 0 0 1px var(--line)!important}
+.lrow .nm{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .c2,.lrow .c3{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .lamt{text-align:right;color:var(--ink);font-family:'Geist Mono',monospace;font-size:14.5px;white-space:nowrap}
+.lrow .lsub{display:none}
+.lrow.w3{grid-template-columns:34px minmax(0,1fr) auto}
+.lrow.r4{grid-template-columns:34px minmax(0,1.5fr) 140px 160px}
+.detail{border-left:1px solid var(--line-2);padding:34px 28px 40px;position:sticky;top:76px;height:calc(100vh - 76px);overflow:auto}
+.dempty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:14px}
+.dhead{text-align:center}
+.dlogo{width:76px;height:76px;border-radius:22px;margin:0 auto 14px;display:grid;place-items:center;font-size:24px;font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.dtitle{font-size:22px;color:var(--ink);font-weight:500;letter-spacing:-.4px;display:flex;justify-content:center;align-items:center;gap:8px}
+.dtitle button{background:none;border:0;color:var(--muted);cursor:pointer;padding:4px}
+.dsub{color:var(--muted);font-size:14px;margin-top:4px}
+.dbig{font-family:'Geist Mono',monospace;font-size:30px;color:var(--ink);margin-top:8px;letter-spacing:-.5px}
+.dcard{border:1px solid var(--line);border-radius:16px;background:var(--glass-2);padding:2px 18px;margin-top:16px}
+.drow{display:flex;justify-content:space-between;gap:14px;padding:12px 0;font-size:14.5px}
+.drow+.drow{border-top:1px solid var(--line-2)}
+.drow span{color:var(--text)} .drow b{color:var(--muted);font-weight:400;text-align:right} .drow b.k{color:var(--ink)}
+.dact{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;background:var(--glass-2);border:1px solid var(--line-2);margin-top:10px;width:100%;text-align:left;cursor:pointer;color:var(--ink);font-size:15px}
+.dact:hover{border-color:var(--line)} .dact svg{width:20px;height:20px;flex:none;color:var(--text)} .dact .r{margin-left:auto;color:var(--muted);font-size:14px;display:flex;align-items:center;gap:8px}
+.dact.danger{color:var(--err)} .dact.danger svg{color:var(--err)}
+.dgroup{border-radius:14px;background:var(--glass-2);border:1px solid var(--line-2);margin-top:10px;overflow:hidden}
+.dgroup .dact{margin:0;border:0;border-radius:0;background:none} .dgroup .dact+.dact{border-top:1px solid var(--line-2)}
+.alert{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);margin-top:16px;font-size:14px;color:var(--ink)}
+.alert .ai{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--errS);color:var(--err);flex:none;font-weight:700}
+.alert .btn{margin-left:auto;background:var(--err)} .alert.warn .ai{background:var(--warnS);color:var(--warn)} .alert.warn .btn{background:var(--blue)}
+.tgl{width:40px;height:24px;border-radius:99px;background:var(--line);position:relative;border:0;cursor:pointer;flex:none}
+.tgl::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.tgl.on{background:var(--blue)} .tgl.on::after{left:19px}
+.tgl:disabled{opacity:.5;cursor:default}
+
+/* logos */
+.lo{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;overflow:hidden}
+.lo svg{width:18px;height:18px}
+.dlogo svg{width:34px;height:34px}
+.pmi{display:inline-grid;place-items:center;height:22px;min-width:34px;padding:0 5px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.3px;flex:none}
+.pm-visa{background:#1a1f71;color:#fff}.pm-mastercard{background:#252525;color:#f7a21b;border:1px solid #444}.pm-amex{background:#2e77bc;color:#fff}
+.pm-binance{background:#F0B90B;color:#111}.pm-bybit{background:#111;color:#F7A600;border:1px solid #333}.pm-kucoin{background:#23AF91;color:#fff}
+.pm-justpay{background:#0b3d91;color:#fff}
+
+/* card visuals */
+.cvis{width:300px;max-width:100%;aspect-ratio:1.586;border-radius:18px;margin:0 auto 18px;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;color:#fff;box-shadow:0 24px 48px -18px rgba(0,0,0,.6);position:relative;overflow:hidden;text-align:left}
+.cvis::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 80% at 100% 0%,rgba(255,255,255,.18),transparent 55%);pointer-events:none}
+.cvis .t{display:flex;justify-content:space-between;align-items:flex-start;font-size:13px;opacity:.9}
+.cvis .cnum{font-family:'Geist Mono',monospace;font-size:17px;letter-spacing:2px}
+.cvis .b{display:flex;justify-content:space-between;align-items:flex-end;font-size:12px}
+.cvis .brand{font-weight:800;font-size:18px;letter-spacing:.5px}
+.cv-card{background:linear-gradient(135deg,#0d0d0d,#2a2a2a)} .cv-card.visa{background:linear-gradient(135deg,#10195c,#2b3aa8)}
+.cv-binance{background:linear-gradient(135deg,#1e1a08,#6b5302)} .cv-bybit{background:linear-gradient(135deg,#0f0f0f,#3a2a05)} .cv-kucoin{background:linear-gradient(135deg,#052a22,#157a64)}
+.cv-justpay{background:linear-gradient(135deg,#061a44,#1C6EF5)}
+.cvis.exp{filter:grayscale(.6) brightness(.8)}
+
+/* composer & forms (ported) */
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:22px;padding:18px}
+.panel+.panel{margin-top:12px}
+.ptitle{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-family:'Geist Mono',monospace;margin:24px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.ptitle a,.ptitle button{color:var(--blue);text-transform:none;letter-spacing:0;font-family:Geist,sans-serif;font-size:13px;cursor:pointer;background:none;border:0}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;background:var(--field);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px}
+.seg a,.seg button{text-align:center;border-radius:9px;padding:8px;font-size:14px;font-weight:500;color:var(--muted);display:flex;justify-content:center;align-items:center;gap:6px;background:none;border:0;cursor:pointer}
+.seg [aria-current="page"],.seg .on{background:var(--blue);color:#fff}
+.seg [aria-current="page"] .soon{background:rgba(255,255,255,.2);color:#fff}
+.box{border:1px solid var(--line);background:var(--field);border-radius:16px;padding:14px 16px}
+.box:focus-within{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}
+.box label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.amtline{display:flex;align-items:center;gap:10px}
+.amtline input{flex:1;min-width:0;border:0;background:none;color:var(--ink);font-family:'Geist Mono',monospace;font-size:32px;padding:0;outline:none}
+.cur{display:flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--glass);color:var(--ink);font-weight:500;cursor:pointer;flex:none}
+.cur i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:700}
+.cur .usdt{background:#26A17B;color:#fff}.cur .lkr{background:#8D153A;color:#FFBE29}
+.out{font-family:'Geist Mono',monospace;font-size:26px;color:var(--ink)}
+.swap{display:flex;justify-content:center;margin:-14px 0;position:relative;z-index:2}
+.swap button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);color:var(--ink);cursor:pointer}
+.qchips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.qc{border:1px solid var(--line);background:var(--glass-2);border-radius:99px;padding:5px 12px;font-family:'Geist Mono',monospace;font-size:13px;cursor:pointer;color:var(--text)}
+.qc:hover,.qc.on{border-color:var(--blue);color:var(--ink)}
+.row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:16px;padding:12px 14px;background:var(--glass-2);margin-top:8px;cursor:pointer;width:100%;text-align:left;color:var(--text)}
+.row:hover{border-color:var(--blue)} .row .k{font-size:12px;color:var(--muted);min-width:34px}
+.row b{display:block;color:var(--ink);font-weight:500} .row small{color:var(--muted)} .row .chev{margin-left:auto;color:var(--muted)}
+.row.need{border-style:dashed}
+.av{width:36px;height:36px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-weight:600;font-size:13px;flex:none}
+.people{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
+.pp{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:66px;background:none;border:0;cursor:pointer;color:var(--text);font-size:12px}
+.pp .av{width:48px;height:48px;font-size:15px;border:2px solid transparent}
+.pp.on .av{border-color:var(--blue)} .pp.add .av{background:var(--glass);color:var(--ink);border:1px dashed var(--line)}
+.pp span{max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rate{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--muted);margin-top:12px;flex-wrap:wrap;align-items:center}
+.rate .mono{color:var(--text)}
+.stepn{font-size:12.5px;color:var(--muted);text-align:center;margin-top:8px}
+.risk{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line-2);background:var(--glass-2);border-radius:12px;padding:10px 12px;margin-top:12px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.risk b{color:var(--text);font-weight:500}
+.risk .ri{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--warn);color:var(--warn);display:grid;place-items:center;font-size:11px;font-weight:700;margin-top:1px}
+.risk a{color:var(--blue)}
+.fld{margin-top:14px} .fld>label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.fld .ferr{color:var(--err);font-size:12.5px;margin-top:5px}
+.fld.bad .f{border-color:var(--err)}
+.f[readonly]{opacity:.75}
+select.f{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px} .three{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+.cd{font-family:'Geist Mono',monospace}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.5;margin-top:14px;color:var(--text);cursor:pointer}
+.chk input{margin-top:3px;accent-color:var(--blue);width:17px;height:17px;flex:none}
+.kv{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:14px;gap:12px} .kv:last-child{border-bottom:0} .kv b{color:var(--ink);font-weight:500;text-align:right}
+.gate{display:flex;gap:12px;align-items:center;border:1px dashed var(--line);border-radius:14px;padding:12px 14px;margin-top:12px;font-size:13.5px}
+.gate b{color:var(--ink);font-weight:500}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tile{border:1px solid var(--line);border-radius:18px;padding:16px;background:var(--glass-2);cursor:pointer;text-align:left;color:var(--text);display:flex;flex-direction:column;gap:10px}
+.tile:hover,.tile.on{border-color:var(--blue)} .tile.on{background:var(--blue-soft)} .tile b{color:var(--ink);font-weight:500;font-size:15px} .tile small{color:var(--muted);font-size:12.5px;line-height:1.4}
+.pmgrid{display:flex;gap:6px;flex-wrap:wrap}
+.uchip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border-radius:99px;background:var(--glass);border:1px solid var(--line-2);color:var(--text)}
+.uchip.off{opacity:.45;text-decoration:line-through}
+.st-completed{background:var(--okS);color:var(--ok)} .st-charging,.st-converting,.st-paying_out,.st-processing{background:var(--blue-soft);color:var(--blue)}
+.st-rate_changed,.st-refund_requested,.st-paused{background:var(--warnS);color:var(--warn)} .st-charge_failed,.st-payout_failed,.st-failed{background:var(--errS);color:var(--err)}
+.hgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+.qa{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.qa a{background:var(--glass-2);border:1px solid var(--line);border-radius:18px;padding:16px 14px;display:flex;flex-direction:column;gap:10px}
+.qa a:hover{border-color:var(--blue)} .qa b{color:var(--ink);font-weight:500} .qa small{color:var(--muted);font-size:12.5px}
+.qa .ico2{width:38px;height:38px;border-radius:12px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center} .qa svg{width:20px;height:20px}
+.ratec{display:flex;justify-content:space-between;align-items:flex-start}
+.ratec .v{font-family:'Geist Mono',monospace;font-size:30px;color:var(--ink)}
+.spark{width:100%;height:46px;margin-top:10px;color:var(--blue)}
+.setup .stp{display:flex;align-items:center;gap:12px;padding:11px 0}
+.setup .stp+.stp{border-top:1px solid var(--line-2)}
+.setup .stp b{color:var(--ink);font-weight:500;display:block;font-size:14.5px} .setup .stp small{color:var(--muted);font-size:12.5px} .setup .go{margin-left:auto}
+.ck{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:12px;flex:none;color:var(--muted)}
+.ck.done{background:var(--ok);border-color:var(--ok);color:#000}
+.pbar{height:6px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:10px 0 4px} .pbar i{display:block;height:100%;background:var(--blue)}
+.legal{margin-top:28px;padding-top:16px;border-top:1px solid var(--line-2);font-size:12px;color:var(--muted);line-height:1.6}
+.legal b{color:var(--text);font-weight:500} .legal a{color:var(--text);text-decoration:underline;text-underline-offset:2px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--field);border-radius:10px;padding:0 10px;height:38px;width:260px}
+.search svg{width:18px;height:18px;color:var(--muted);flex:none}
+.search input{border:0;background:none;color:var(--ink);outline:none;font:inherit;font-size:14px;flex:1;min-width:0}
+.empty{text-align:center;padding:48px 16px;color:var(--muted)} .empty b{display:block;color:var(--ink);font-weight:500;margin-bottom:6px;font-size:16px}
+table.fees{width:100%;border-collapse:collapse;font-size:14px} table.fees td,table.fees th{padding:12px 6px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+table.fees tr:last-child td{border-bottom:0} table.fees th{color:var(--muted);font-weight:400;font-size:12px;text-transform:uppercase;letter-spacing:.6px;font-family:'Geist Mono',monospace}
+table.fees td:last-child,table.fees th:last-child{text-align:right}
+
+/* auth screen */
+.auth{min-height:100vh;display:grid;place-items:center;padding:24px;position:relative}
+.auth::before{content:"";position:fixed;inset:0;background:var(--glow);pointer-events:none}
+.authc{width:100%;max-width:420px;position:relative}
+.authc .lg svg{height:30px;width:auto;color:var(--ink)}
+.sso{display:flex;align-items:center;justify-content:center;gap:10px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--glass);color:var(--ink);font-size:15px;font-weight:500;cursor:pointer;width:100%;margin-top:10px}
+.sso:hover{border-color:var(--blue)} .sso .g{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px;margin:18px 0 4px} .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line-2)}
+.otp{display:flex;gap:8px;justify-content:space-between} .otp input{width:48px;height:56px;text-align:center;font-size:22px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--ink);font-family:'Geist Mono',monospace}
+.otp input:focus{outline:none;border-color:var(--blue)}
+
+/* mobile */
+.bnav{display:none}
+@media (max-width:1180px){.md{grid-template-columns:minmax(0,1fr) 380px}.lrow{grid-template-columns:34px minmax(0,1.5fr) minmax(0,1fr) 110px}.lrow .c3{display:none}.lrow.r4{grid-template-columns:34px minmax(0,1fr) 130px}.lrow.r4 .c2{display:none}}
+@media (max-width:940px){.app{grid-template-columns:76px minmax(0,1fr)}.side{padding:20px 10px}.side .lbl,.side .sgrp,.meb div,.side .demo,.side .lg .wm{display:none}.nv{justify-content:center;padding:12px}.nv .soon{display:none}.side .lg{justify-content:center;padding:0 0 18px}.meb{justify-content:center;padding:12px 0 4px}
+  .md{grid-template-columns:minmax(0,1fr) 340px}.hgrid{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}.side{display:none}
+  .bnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:40;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(12px);border-top:1px solid var(--line-2);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  .bnav a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted);padding:4px 0} .bnav svg{width:22px;height:22px} .bnav a[aria-current="page"]{color:var(--blue)}
+  main{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .phead{height:60px;padding:0 16px}.phead h1{font-size:20px}.pad{padding:16px 16px 40px}
+  .back{display:grid}
+  .md{grid-template-columns:1fr;min-height:0}.md .list{border-right:0;padding:4px 6px 20px}
+  .md.sel .list{display:none}.md:not(.sel) .detail{display:none}
+  .detail{position:static;height:auto;padding:22px 16px 30px;border-left:0}
+  .lrow,.lrow.r4{grid-template-columns:34px minmax(0,1fr) auto;padding:11px 10px}.lrow .c2,.lrow .c3{display:none}.lrow .lsub{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .search{width:auto;flex:1}.qa{grid-template-columns:repeat(2,1fr)}.tiles{grid-template-columns:1fr}
+  .amtline input{font-size:28px}.out{font-size:22px}.toast{bottom:92px}.three{grid-template-columns:1fr 1fr}.three .fld:first-child{grid-column:span 2}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+/* =====================================================================
+   CeyPay: standalone demo (no backend). Hash router; the in-browser store
+   stands in for Clerk (auth), Pay&Go (cards, bills), LankaClear JustPay
+   (bank debits), CeyPay Direct Debit + Offramp (exchanges → LKR).
+   ===================================================================== */
+const LOGO=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 649.76 208.83" role="img" aria-label="CeyPay"><style>.lg path{fill:currentColor}.lg .f{fill:#1c6ef5}</style><path d="M265.9,30.73c1.08,2.81,4.74,3.41,6.66,1.09,2.86-3.44,6.39-6.29,10.58-8.54,7.2-3.86,15.01-5.79,23.41-5.79,17.32,0,30.96,6.3,40.91,18.91,9.95,12.61,14.92,27.83,14.92,45.67,0,12.01-2.57,22.94-7.72,32.8-5.15,9.86-11.83,17.41-20.07,22.64-8.23,5.23-17.62,8.36-28.17,9.39-8.79.86-17.66-.67-26.63-4.57-2.55-1.11-5.4.81-5.4,3.6v58.82c0,2.15-1.75,3.9-3.9,3.9h-28.22c-2.15,0-3.9-1.75-3.9-3.9V55.7c0-.6-.04-1.58-.13-2.96-.09-1.37-.22-2.27-.39-2.7-.17-.43-.43-1.11-.77-2.06-.35-.94-.82-1.58-1.42-1.93-.6-.34-1.29-.73-2.06-1.16-.77-.43-1.76-.64-2.96-.64h0c-2.14,0-3.88-1.72-3.9-3.86l-.18-16.81c-.02-1.91,1.35-3.56,3.23-3.89,3.61-.63,7.07-.97,10.37-1.04,4.29-.08,8.62.35,12.99,1.29,4.37.95,7.85,3.13,10.42,6.56.94,1.26,1.71,2.67,2.31,4.23ZM273.37,77.44v30c0,1.52.88,2.89,2.25,3.54,8.08,3.86,15.69,5.67,22.83,5.44,7.8-.26,14.36-3.51,19.68-9.78,5.31-6.26,7.98-14.45,7.98-24.57,0-8.92-2.36-16.63-7.08-23.15-4.72-6.52-11.36-9.78-19.94-9.78-7.72.17-13.89,3-18.52,8.49-4.63,5.49-7.03,12.09-7.2,19.81Z"/><path d="M469.26,134.06c-.79-2.44-3.89-3.12-5.56-1.17-3.31,3.87-7.63,6.96-12.95,9.25-8.15,3.51-16.68,5.27-25.6,5.27-12.01,0-22.43-3.56-31.26-10.68-8.84-7.12-13.42-16.51-13.76-28.17-.69-14.58,3.51-25.68,12.61-33.32,9.09-7.63,20.92-11.45,35.5-11.45,11.21,0,20.67,1.82,28.36,5.46,2.13,1.01,4.57-.59,4.57-2.94v-3.04c0-11.83-10.29-17.75-30.87-17.75-12.94,0-23.62,1.87-32.05,5.61-1.91.85-4.11-.32-4.48-2.38l-3.42-19.01c-.27-1.49.54-2.95,1.93-3.56,12.53-5.45,27.26-8.18,44.19-8.18,39.45,0,59.17,15.44,59.17,46.31v44.77c0,3.43.04,5.83.13,7.2.08,1.38.47,2.96,1.16,4.76.68,1.8,1.84,2.96,3.47,3.47,1.02.32,2.28.51,3.8.56,1.7.06,3.04,1.49,3.06,3.19l.18,14.06c.02,1.61-1.16,2.99-2.75,3.24-5.5.88-10.75,1.32-15.74,1.32-5.83,0-10.76-1.76-14.79-5.27-2.28-1.99-3.92-4.51-4.91-7.57ZM460.4,100.41v-4.48c0-1.14-.61-2.19-1.58-2.79-6.69-4.1-14.69-6.16-23.99-6.18-.1,0-.21,0-.31,0-5.94.37-10.77,2.21-14.51,5.52-3.77,3.34-5.32,7.93-4.63,13.76.34,4.29,2.14,7.59,5.4,9.91,3.26,2.32,7.12,3.47,11.58,3.47,6.69,0,12.9-1.67,18.65-5.02,5.69-3.31,8.81-7.92,9.37-13.84.01-.12.02-.25.02-.37Z"/><path d="M649.76,24.57c0,.43-.08.85-.24,1.25l-52.24,131.38c-3.43,8.75-6.69,16.04-9.78,21.87-3.09,5.83-6.78,11.19-11.06,16.08-4.29,4.89-8.96,8.32-14.02,10.29-5.06,1.97-11.11,2.79-18.14,2.44-6.31-.31-13.39-1.79-21.22-4.45-1.56-.53-2.53-2.1-2.28-3.74l2.8-18.1c.32-2.06,2.41-3.35,4.39-2.7,8.49,2.8,15.22,2.81,20.17.04,5.66-3.18,10.38-10.08,14.15-20.71l4.17-11.57c.3-.83.26-1.74-.1-2.54l-53.42-118.23c-.2-.44-.3-.91-.3-1.39h0c0-1.87,1.52-3.39,3.39-3.39h32.14c1.39,0,2.63.84,3.15,2.13l15.87,39.8,16.21,45.79h.77l14.15-45.54,14.12-39.93c.48-1.35,1.76-2.26,3.19-2.26h30.75c1.87,0,3.39,1.52,3.39,3.39v.08Z"/><path class="f" d="M103.83,0C51.19,0,7.6,38.52,0,88.75h32.06c7.22-32.83,36.58-57.43,71.77-57.43s64.55,24.6,71.77,57.43h-32.81c-6.23-15.32-21.32-26.1-38.95-26.1-23.2,0-42,18.7-42,41.77s18.81,41.77,42,41.77c17.62,0,32.72-10.8,38.95-26.1h32.81c-7.22,32.83-36.58,57.43-71.77,57.43s-64.55-24.6-71.77-57.43H0c7.6,50.23,51.19,88.75,103.83,88.75,57.99,0,105.01-46.75,105.01-104.42S161.82,0,103.83,0h0Z"/></svg>`;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=(n,d=2)=>Number(n||0).toLocaleString('en-LK',{minimumFractionDigits:d,maximumFractionDigits:d});
+const lkr=n=>'LKR '+fmt(n);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const store={get(k,d){try{return JSON.parse(localStorage.getItem('cpw_'+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem('cpw_'+k,JSON.stringify(v))}catch(e){}}};
+const uid=p=>p+Math.random().toString(16).slice(2,12).toUpperCase();
+const initials=n=>String(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+const mask4=a=>String(a).slice(-4);
+const dLong=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+const dShort=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+const dTime=t=>new Date(t).toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'});
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200)}
+const hue=s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return h};
+
+/* ---------------- icons ---------------- */
+const P=(d,w=1.7)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC={
+ home:P('<path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/>'),
+ activity:P('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+ recurring:P('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M9 15l2 2 4-4"/>'),
+ wallet:P('<path d="M3 7a2 2 0 012-2h13v4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 13.5h2"/>'),
+ sell:P('<path d="M12 4v12M6 10l6 6 6-6M5 20h14"/>'),send:P('<path d="M4 12l16-8-6 16-2-7z"/>'),buy:P('<path d="M12 20V8M6 14l6-6 6 6M5 4h14"/>'),
+ bill:P('<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>'),
+ rates:P('<path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/>'),
+ search:P('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'),plus:P('<path d="M12 5v14M5 12h14"/>',2),
+ edit:P('<path d="M4 20h4L20 8l-4-4L4 16z"/>'),help:P('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/>'),
+ hist:P('<path d="M5 3h11l3 3v15H5z"/><path d="M9 9h6M9 13h6M9 17h3"/>'),heart:P('<path d="M12 20s-7-4.5-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.5-7 10-7 10z"/>'),
+ card:P('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>'),x:P('<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>'),
+ homeB:P('<path d="M3 11l9-7 9 7v9H3z"/><path d="M9 21v-6h6v6"/>'),store:P('<path d="M4 9h16l-1-5H5zM4 9v11h16V9M9 20v-6h6v6"/>'),
+ pause:P('<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>'),play:P('<circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/>'),
+ bolt:P('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),shield:P('<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/>'),
+ user:P('<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>'),chev:P('<path d="M9 6l6 6-6 6"/>'),ext:P('<path d="M7 17L17 7M9 7h8v8"/>'),back:P('<path d="M15 6l-6 6 6 6"/>',2),
+ bank:P('<path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 21h18"/>'),phone:P('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>'),
+ swap:P('<path d="M7 4v14M3 14l4 4 4-4M17 20V6M13 10l4-4 4 4"/>'),logout:P('<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/>')};
+
+/* ---------------- config ---------------- */
+const CFG={fee_pct:1.5,min_usdt:5,daily_limit_usdt:2000,tol_pct:0.5,base_rate:326.25,bill_fee:0,
+  company:'CeylonCash PVT LTD',reg_no:'[PV 000000]',reg_status:'[to be confirmed under Sri Lanka’s VASP framework]',support:'support@ceypay.io',
+  relationships:['Family','Spouse','Parent','Child','Sibling','Friend','Employee','Business','Other'],
+  purposes:['Family support','Education','Medical','Savings','Salary','Business payment','Gift','Other']};
+const BANKS=[{code:7010,name:'Bank of Ceylon'},{code:7056,name:'Commercial Bank PLC'},{code:7083,name:'Hatton National Bank PLC'},{code:7135,name:"People's Bank"},{code:7278,name:'Sampath Bank PLC'},{code:7287,name:'Seylan Bank PLC'},{code:7162,name:'Nations Trust Bank PLC'},{code:7454,name:'DFCC Bank PLC'},{code:7214,name:'National Development Bank PLC'},{code:7719,name:'National Savings Bank'},{code:7311,name:'Pan Asia Banking Corporation PLC'},{code:7302,name:'Union Bank of Colombo PLC'}].sort((a,b)=>a.name.localeCompare(b.name));
+const bankShort=n=>n.replace(/ (PLC|Bank PLC)$/,'').replace(' Bank','').replace('Hatton National','HNB').replace('Commercial','ComBank').replace('National Development','NDB').replace('Nations Trust','NTB').replace('National Savings','NSB');
+const BILLERS=[{code:'CEB',name:'Ceylon Electricity Board',cat:'Electricity',varies:true},{code:'LECO',name:'LECO',cat:'Electricity',varies:true},{code:'NWSDB',name:'National Water Supply',cat:'Water',varies:true},
+ {code:'SLT',name:'SLT Broadband',cat:'Internet',varies:true},{code:'DIALOG_PP',name:'Dialog Postpaid',cat:'Mobile',varies:true},{code:'DIALOGTV',name:'Dialog TV',cat:'TV',varies:false},{code:'AIA',name:'AIA Insurance',cat:'Insurance',varies:false}];
+const OPS={'070':'Mobitel','071':'Mobitel','072':'Hutch','078':'Hutch','074':'Dialog','076':'Dialog','077':'Dialog','075':'Airtel'};
+const EX={binance:'Binance',bybit:'Bybit',kucoin:'KuCoin'};
+
+/* ---------------- FX (fx.ceyloncash.com; snapshot fallback) ---------------- */
+const FX_BASE='https://fx.ceyloncash.com',FX_FIELD='telegraphic_transfers_buying_rate';
+const FX_SNAPSHOT={"USD":{"description":"US DOLLARS","buying_rate":324.34102,"selling_rate":334.25,"telegraphic_transfers_buying_rate":326.25,"telegraphic_transfers_selling_rate":334.25},"EUR":{"description":"EURO","buying_rate":366.99234,"selling_rate":381.94747,"telegraphic_transfers_buying_rate":369.54337,"telegraphic_transfers_selling_rate":381.94747},"GBP":{"description":"STERLING POUNDS","buying_rate":426.856,"selling_rate":443.43276,"telegraphic_transfers_buying_rate":429.55706,"telegraphic_transfers_selling_rate":443.43276},"AED":{"description":"UAE DIRHAMS","buying_rate":83.74975,"selling_rate":93.0294,"telegraphic_transfers_buying_rate":86.93161,"telegraphic_transfers_selling_rate":93.0294},"SAR":{"description":"SAUDI ARABIAN RIYALS","buying_rate":80.86413,"selling_rate":90.95857,"telegraphic_transfers_buying_rate":0,"telegraphic_transfers_selling_rate":0},"QAR":{"description":"QATAR RIYALS","buying_rate":72.79994,"selling_rate":93.74956,"telegraphic_transfers_buying_rate":0,"telegraphic_transfers_selling_rate":0},"KWD":{"description":"KUWAITI DINARS","buying_rate":921.79617,"selling_rate":1082.46838,"telegraphic_transfers_buying_rate":0,"telegraphic_transfers_selling_rate":0},"OMR":{"description":"OMANI RIYALS","buying_rate":801.76968,"selling_rate":868.17054,"telegraphic_transfers_buying_rate":0,"telegraphic_transfers_selling_rate":0},"SGD":{"description":"SINGAPORE DOLLARS","buying_rate":250.49792,"selling_rate":265.45686,"telegraphic_transfers_buying_rate":251.12574,"telegraphic_transfers_selling_rate":265.45686},"AUD":{"description":"AUSTRALIAN DOLLARS","buying_rate":224.97278,"selling_rate":237.75203,"telegraphic_transfers_buying_rate":225.53662,"telegraphic_transfers_selling_rate":237.75203},"CAD":{"description":"CANADIAN DOLLAR","buying_rate":227.90659,"selling_rate":237.16607,"telegraphic_transfers_buying_rate":229.85874,"telegraphic_transfers_selling_rate":237.16607},"JPY":{"description":"JAPANESE YEN","buying_rate":2.04644,"selling_rate":2.11624,"telegraphic_transfers_buying_rate":2.0526,"telegraphic_transfers_selling_rate":2.11624},"INR":{"description":"INDIAN RUPEES","buying_rate":3.00516,"selling_rate":3.59549,"telegraphic_transfers_buying_rate":3.29666,"telegraphic_transfers_selling_rate":3.59549},"BTC":{"description":"BITCOIN","avg_rate_lkr":25335000,"usd_price":84450},"_meta":{"as_of":"20260925","age_days":0,"stale":false}};
+const FX_HIST=[324.5,324.5,324.5,325.25,328,328,326,326,326,327,325.5,325,326.5,326.25];
+let FX={data:FX_SNAPSHOT,source:'snapshot',checked:0};
+async function loadFx(){try{const c=new AbortController();const to=setTimeout(()=>c.abort(),5000);const r=await fetch(FX_BASE+'/currencies',{signal:c.signal,cache:'no-store'});clearTimeout(to);const d=await r.json();if(!d?.USD?.[FX_FIELD])throw 0;FX={data:d,source:'live',checked:Date.now()};FX_HIST[FX_HIST.length-1]=d.USD[FX_FIELD];render()}catch(e){FX.checked=Date.now()}}
+const rate=()=>Math.round((FX.data.USD?.[FX_FIELD]||CFG.base_rate)*100)/100;
+const fxDate=()=>{const k=FX.data._meta?.as_of;return k?dLong(k.slice(0,4)+'-'+k.slice(4,6)+'-'+k.slice(6)):'—'};
+const fxBadge=()=>FX.data._meta?.stale?'<span class="stat st-rate_changed">Stale</span>':FX.source==='live'?'<span class="stat st-completed">Live</span>':'<span class="stat st-charging" title="Live rates couldn’t be loaded, so the last known rates are shown">Snapshot</span>';
+const titleCase=s=>s.toLowerCase().replace(/\b\w/g,m=>m.toUpperCase()).replace(/\b(Uae|Us)\b/g,m=>m.toUpperCase());
+
+/* ---------------- store ---------------- */
+const KEYS=['user','kyc','methods','payees','tx','recurring','waitlist','defaultId','names'];
+const DB={};KEYS.forEach(k=>DB[k]=store.get(k,{methods:[],payees:[],tx:[],recurring:[],names:{}}[k]??null));DB.kyc=DB.kyc||'not_started';
+const save=()=>KEYS.forEach(k=>store.set(k,DB[k]));
+const M=id=>DB.methods.find(m=>m.id===id);
+const isExpired=m=>{if(m.type!=='card')return false;const [mm,yy]=m.exp.split('/').map(Number);return new Date(2000+yy,mm,1)<=new Date()};
+const mStatus=m=>isExpired(m)?'expired':m.status||'active';
+const USES={exchange:['sell','send','bill','reload'],card:['bill','reload'],justpay:['bill','reload','buy']};
+const USE_L={sell:'Sell USDT',send:'Send money',bill:'Bills',reload:'Reloads',buy:'Buy (soon)'};
+const eligible=(use)=>DB.methods.filter(m=>USES[m.type].includes(use)&&mStatus(m)==='active');
+const defaultFor=use=>{const l=eligible(use);return l.find(m=>m.id===DB.defaultId)||l[0]||null};
+function mName(m){if(!m)return 'Removed method';if(m.nick)return m.nick;if(m.type==='card')return `${m.brandName} ${m.funding} ${m.last4}`;if(m.type==='justpay')return `JustPay · ${bankShort(m.bank)} ${m.last4}`;return `${EX[m.provider]} · ${m.label}`}
+function pmIcon(m){if(!m)return '<span class="pmi" style="background:var(--line)">—</span>';if(m.type==='card')return `<span class="pmi pm-${m.brand}">${{visa:'VISA',mastercard:'MC',amex:'AMEX'}[m.brand]}</span>`;if(m.type==='justpay')return '<span class="pmi pm-justpay">JP</span>';return `<span class="pmi pm-${m.provider}">${EX[m.provider][0]}</span>`}
+function cpLogo(cp,big){const cls=big?'dlogo':'lo';
+  if(cp.kind==='sell')return `<span class="${cls}" style="background:var(--blue-soft);color:var(--blue)">${IC.sell}</span>`;
+  if(cp.kind==='person')return `<span class="${cls}" style="background:hsl(${hue(cp.name)} 60% 50% / .18);color:hsl(${hue(cp.name)} 70% 62%);border-radius:50%">${esc(initials(cp.name))}</span>`;
+  const map={CEB:['#f6a800','#1a1300'],LECO:['#e2231a','#fff'],NWSDB:['#0072bc','#fff'],SLT:['#1c3f94','#fff'],Dialog:['#ec1c24','#fff'],DIALOG_PP:['#ec1c24','#fff'],DIALOGTV:['#ec1c24','#fff'],Mobitel:['#009a44','#fff'],Hutch:['#ff6a13','#fff'],Airtel:['#e40000','#fff'],AIA:['#d31145','#fff']};
+  const [bg,fg]=map[cp.code]||[`hsl(${hue(cp.name)} 45% 40%)`,'#fff'];return `<span class="${cls}" style="background:${bg};color:${fg}">${esc((cp.short||cp.code||cp.name).slice(0,3).replace('_',''))}</span>`}
+const txTitle=t=>DB.names[t.cp.key]||t.cp.name;
+
+/* ---------------- quotes / engine (mock CeyPay DD + Offramp) ---------------- */
+function quote(usdt,lkrWant){const r=rate(),keep=1-CFG.fee_pct/100;const gross=lkrWant?Math.ceil(lkrWant/r/keep*100)/100:Math.round(usdt*100)/100;const net=gross*keep;return{gross_usdt:gross,fees_usdt:Math.round((gross-net)*100)/100,rate:r,lkr_out:Math.floor(net*r*100)/100,at:Date.now()}}
+const spentBy=(id,days)=>DB.tx.filter(t=>t.method_id===id&&t.usdt&&!/charge_failed|failed/.test(t.state)&&t.created>Date.now()-days*864e5).reduce((s,t)=>s+t.usdt,0);
+const daySpent=()=>DB.tx.filter(t=>t.usdt&&!/charge_failed/.test(t.state)&&t.created>Date.now()-864e5).reduce((s,t)=>s+t.usdt,0);
+function newTx(o){const t={id:uid(o.kind==='sell'?'SL-':o.kind==='remit'?'RM-':'BP-'),created:Date.now(),_t0:Date.now(),...o};DB.tx.unshift(t);save();return t}
+function advance(t,act){
+  if(['completed','payout_failed','charge_failed','refund_requested','failed'].includes(t.state))return t;
+  if(act==='refund'&&t.state==='rate_changed'){t.state='refund_requested';t.message='Refund requested. Support will return your USDT to the exchange account.';save();return t}
+  const dt=Date.now()-t._t0;
+  if(t.kind==='bill'||t.kind==='reload'){if(dt>1600){if(t._fail){t.state='failed';t.message='The biller rejected the payment. You weren’t charged.'}else{t.state='completed';t.biller_ref='PG'+Math.floor(1e8+Math.random()*9e8)}save()}return t}
+  if(t.state==='charging'&&dt>1100)t.state='converting';
+  if(t.state==='converting'||(t.state==='rate_changed'&&act==='accept')){const q=quote(t.usdt);
+    if(t._drop&&act!=='accept'){q.lkr_out=Math.floor(t.quoted_lkr*.97*100)/100;q.rate=Math.round(t.quote_rate*.97*100)/100;delete t._drop}
+    if(q.lkr_out<t.quoted_lkr*(1-CFG.tol_pct/100)&&act!=='accept'){t.state='rate_changed';t.new_lkr=q.lkr_out;t.new_rate=q.rate}
+    else{t.state='paying_out';t.rate=t.new_rate||q.rate;t.lkr=t.new_lkr||q.lkr_out;t._p0=Date.now()}}
+  if(t.state==='paying_out'&&Date.now()-t._p0>1800){if(t._fail){t.state='payout_failed';t.message='The recipient bank rejected the transfer: account closed or invalid.'}else{t.state='completed';t.bank_ref='CEFT'+Math.floor(1e9+Math.random()*9e9)}}
+  save();return t}
+const LIVE=s=>['charging','converting','paying_out','processing'].includes(s);
+const stLabel=s=>({charging:'Collecting',converting:'Converting',paying_out:'Paying out',processing:'Processing',completed:'Completed',rate_changed:'Needs your OK',refund_requested:'Refund requested',payout_failed:'Payout failed',charge_failed:'Failed',failed:'Failed'})[s]||s;
+
+/* ---------------- sample data ---------------- */
+function seed(){const now=Date.now(),D=864e5,name=DB.user.name;
+  const c1={id:uid('pm_'),type:'card',brand:'visa',brandName:'Visa',funding:'Credit',last4:'7892',exp:'09/28',holder:name,billing:'71/2, Kesbewa',issuer:'Commercial Bank',created:now-200*D};
+  const c2={id:uid('pm_'),type:'card',brand:'mastercard',brandName:'Mastercard',funding:'Debit',last4:'6322',exp:'08/26',holder:name,billing:'71/2, Kesbewa',issuer:'Sampath Bank',created:now-300*D};
+  const j1={id:uid('pm_'),type:'justpay',bank:'Sampath Bank PLC',bank_code:7278,last4:'4410',mobile:'0771234567',limit:100000,created:now-120*D};
+  const e1={id:uid('pm_'),type:'exchange',provider:'binance',label:'Main',per_txn_limit:500,monthly_limit:2000,created:now-90*D};
+  const e2={id:uid('pm_'),type:'exchange',provider:'bybit',label:'Trading',per_txn_limit:300,monthly_limit:1000,created:now-40*D};
+  DB.methods=[e1,j1,c1,c2,e2];DB.defaultId=j1.id;DB.kyc='verified';
+  const own={id:uid('pay_'),is_self:true,bank_code:7278,bank_name:'Sampath Bank PLC',account_number:'123456789012',account_name:name,nickname:'My Sampath',relationship:'Self'};
+  const amma={id:uid('pay_'),is_self:false,bank_code:7010,bank_name:'Bank of Ceylon',account_number:'8800112233',account_name:'K A Perera',nickname:'Amma',relationship:'Parent',mobile:'0771112233'};
+  DB.payees=[own,amma];
+  const r1={id:uid('rc_'),type:'bill',name:'Ceylon Electricity Board',cp:{kind:'biller',code:'CEB',name:'Ceylon Electricity Board',key:'CEB'},plan:'Monthly autopay',account:'1234567890',amount:null,cap:20000,freq:'monthly',day:12,method_id:j1.id,status:'active',created:now-100*D};
+  const r2={id:uid('rc_'),type:'reload',name:'Dialog reload',cp:{kind:'biller',code:'Dialog',name:'Dialog',key:'DIALOG_RL'},plan:'Monthly · 077 123 4567',account:'0771234567',amount:500,freq:'monthly',day:1,method_id:c1.id,status:'active',created:now-150*D};
+  const r3={id:uid('rc_'),type:'remit',name:'Amma',cp:{kind:'person',name:'Amma',key:'p:'+amma.id},plan:'Monthly · Family support',payee_id:amma.id,amount:25000,freq:'monthly',day:28,method_id:e1.id,purpose:'Family support',status:'active',created:now-80*D};
+  const r4={id:uid('rc_'),type:'bill',name:'SLT Broadband',cp:{kind:'biller',code:'SLT',name:'SLT Broadband',key:'SLT'},plan:'Monthly autopay',account:'0112345678',amount:null,cap:8000,freq:'monthly',day:5,method_id:c2.id,status:'canceled',created:now-260*D,canceled:now-30*D};
+  DB.recurring=[r1,r2,r3,r4];
+  const T=(days,o)=>({id:uid(o.kind==='sell'?'SL-':o.kind==='remit'?'RM-':'BP-'),created:now-days*D,state:'completed',...o});
+  DB.tx=[
+   T(1,{kind:'bill',cp:r1.cp,title:'Ceylon Electricity Board',method_id:j1.id,lkr:8740,fee_lkr:0,account:'1234567890',biller_ref:'PG482910337',recurring_id:r1.id}),
+   T(3,{kind:'sell',cp:{kind:'sell',name:'Sold USDT',key:'sell'},method_id:e1.id,usdt:100,fees_usdt:1.5,rate:326.5,lkr:32160.25,payee:{name,bank:'Sampath Bank PLC',account:'•••9012',self:true},bank_ref:'CEFT2339591087'}),
+   T(6,{kind:'remit',cp:r3.cp,method_id:e1.id,usdt:77.76,fees_usdt:1.17,rate:327,lkr:25045.4,purpose:'Family support',payee:{name:'K A Perera',nickname:'Amma',bank:'Bank of Ceylon',account:'•••2233',relationship:'Parent'},bank_ref:'CEFT1769562825',recurring_id:r3.id}),
+   T(24,{kind:'reload',cp:r2.cp,method_id:c1.id,lkr:500,fee_lkr:0,account:'0771234567',biller_ref:'PG190023841',recurring_id:r2.id}),
+   T(31,{kind:'bill',cp:r4.cp,method_id:c2.id,lkr:5990,fee_lkr:0,account:'0112345678',biller_ref:'PG771230019',recurring_id:r4.id}),
+   T(33,{kind:'bill',cp:r1.cp,method_id:j1.id,lkr:7215,fee_lkr:0,account:'1234567890',biller_ref:'PG330182774',recurring_id:r1.id}),
+   T(36,{kind:'remit',cp:r3.cp,method_id:e1.id,usdt:77.52,fees_usdt:1.16,rate:328,lkr:25046.1,purpose:'Family support',payee:{name:'K A Perera',nickname:'Amma',bank:'Bank of Ceylon',account:'•••2233',relationship:'Parent'},bank_ref:'CEFT9921834401',recurring_id:r3.id}),
+   T(45,{kind:'sell',cp:{kind:'sell',name:'Sold USDT',key:'sell'},method_id:e2.id,usdt:250,fees_usdt:3.75,rate:325,lkr:80031.25,payee:{name,bank:'Sampath Bank PLC',account:'•••9012',self:true},state:'payout_failed',message:'The recipient bank rejected the transfer: account under review.'}),
+   T(55,{kind:'reload',cp:r2.cp,method_id:c1.id,lkr:500,fee_lkr:0,account:'0771234567',biller_ref:'PG110293847',recurring_id:r2.id}),
+   T(62,{kind:'bill',cp:r4.cp,method_id:c2.id,lkr:5990,fee_lkr:0,account:'0112345678',biller_ref:'PG662019283',recurring_id:r4.id}),
+   T(64,{kind:'bill',cp:r1.cp,method_id:j1.id,lkr:6980,fee_lkr:0,account:'1234567890',biller_ref:'PG201938475',recurring_id:r1.id}),
+   T(92,{kind:'bill',cp:{kind:'biller',code:'NWSDB',name:'National Water Supply',key:'NWSDB'},method_id:j1.id,lkr:1860,fee_lkr:0,account:'10121234567',biller_ref:'PG119283746'})];
+  save()}
+
+/* ---------------- router ---------------- */
+const draft={tab:'sell',incur:'USDT',amount:'',payee:{sell:null,send:null},account:null,q:null};
+let TIMERS=[];const every=(fn,ms)=>TIMERS.push(setInterval(fn,ms));
+function go(h){if(location.hash===h)render();else location.hash=h}
+function parse(){const h=location.hash.replace(/^#\/?/,'')||'home';const [path,qs]=h.split('?');return{parts:path.split('/'),q:new URLSearchParams(qs||'')}}
+const R={};
+const PUBLIC=['signin','info','rates'];
+function render(){TIMERS.forEach(clearInterval);TIMERS=[];const {parts,q}=parse();let name=parts[0];
+  if(!DB.user&&!PUBLIC.includes(name)){if(name!=='home')store.set('after',location.hash);name='signin'}
+  const fn=R[name]||R.home;
+  if(name==='signin'){$('root').innerHTML=fn(parts.slice(1),q);fn.after?.(parts.slice(1),q);return}
+  const body=fn(parts.slice(1),q);if(body===undefined)return;
+  const top=({review:'move',transfer:'activity',sell:'move',send:'move',buy:'buy',verify:'account',payee:'account',info:'account',rates:'home'})[name]||name;
+  $('root').innerHTML=shell(top,body);fn.after?.(parts.slice(1),q);
+  if(!parts[1])scrollTo(0,0)}
+addEventListener('hashchange',render);
+function shell(top,body){const u=DB.user||{name:'Guest',email:'Not signed in'};const alert=DB.methods.some(isExpired);
+  const nav=(r,label,icon,extra='')=>`<a class="nv" href="#/${r}" ${top===r?'aria-current="page"':''}>${icon}<span class="lbl">${label}</span>${extra}</a>`;
+  return `<div class="app"><aside class="side">
+    <a class="lg" href="#/home" aria-label="CeyPay home"><span class="wm">${LOGO}</span><span class="demo">DEMO</span></a>
+    ${nav('home','Home',IC.home)}${nav('activity','Activity',IC.activity)}${nav('recurring','Recurring',IC.recurring)}${nav('wallet','Wallet',IC.wallet,alert?'<span class="dot" title="Needs attention"></span>':'')}
+    <div class="sgrp">Move money</div>
+    <a class="nv" href="#/sell" ${top==='move'&&draft.tab==='sell'?'aria-current="page"':''}>${IC.sell}<span class="lbl">Sell USDT</span></a>
+    <a class="nv" href="#/send" ${top==='move'&&draft.tab==='send'?'aria-current="page"':''}>${IC.send}<span class="lbl">Send money</span></a>
+    <a class="nv" href="#/buy" ${top==='buy'?'aria-current="page"':''}>${IC.buy}<span class="lbl">Buy USDT <span class="soon">Soon</span></span></a>
+    <div class="sp"></div>
+    <button class="meb" onclick="go('#/account')"><span class="avt">${esc(initials(u.name))}</span><div><b>Hello ${esc(u.name.split(' ')[0])}</b><small>${esc(u.email||u.phone||'')}</small></div></button>
+  </aside><main>${body}</main></div>
+  <nav class="bnav">${[['home','Home',IC.home],['activity','Activity',IC.activity],['sell','Move',IC.swap],['recurring','Recurring',IC.recurring],['wallet','Wallet',IC.wallet]].map(([r,l,i])=>`<a href="#/${r}" ${(top===r||(r==='sell'&&(top==='move'||top==='buy')))?'aria-current="page"':''}>${i}${l}</a>`).join('')}</nav>`}
+const phead=(title,right='',backTo)=>`<header class="phead">${backTo?`<button class="ib back" onclick="go('${backTo}')" aria-label="Back">${IC.back}</button>`:''}<h1>${title}</h1><div class="sp"></div>${right}</header>`;
+const legal=()=>`<div class="legal">${esc(CFG.company)} · Registration no. <b>${esc(CFG.reg_no)}</b> · Regulatory status: <b>${esc(CFG.reg_status)}</b><br>Digital assets are not legal tender in Sri Lanka, are not issued or guaranteed by the Central Bank of Sri Lanka, and can lose value. <a href="#/info/safety">Safety</a> · <a href="#/info/fees">Fees &amp; limits</a> · <a href="#/info/faq">Help</a></div>`;
+function field(id,err){const f=$(id).closest('.fld');f.classList.toggle('bad',!!err);f.querySelector('.ferr').textContent=err||'';if(err)$(id).focus();return !err}
+function armed(b,txt){if(b.dataset.armed)return true;b.dataset.armed=1;const o=b.innerHTML;b.textContent=txt;setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.innerHTML=o}},2600);return false}
+
+/* ================= SIGN IN ================= */
+let AUTH={step:'start'};
+R.signin=()=>{const s=AUTH.step;
+  const head=`<div class="lg" style="text-align:center;margin-bottom:22px">${LOGO}</div>`;
+  let body='';
+  if(s==='start')body=`<h1 style="font-size:26px;letter-spacing:-.6px;margin:0;color:var(--ink);font-weight:500;text-align:center">Welcome to CeyPay</h1>
+    <p style="color:var(--muted);text-align:center;margin:8px 0 18px">Sign in or create an account. It takes seconds.</p>
+    <button class="sso" data-sso="google"><span class="g" style="background:#fff;color:#4285f4">G</span>Continue with Google</button>
+    <button class="sso" data-sso="apple"><span class="g" style="background:var(--ink);color:var(--bg)">A</span>Continue with Apple</button>
+    <button class="sso" data-sso="binance"><span class="g pm-binance" style="border-radius:6px">B</span>Continue with Binance</button>
+    <div class="or">or</div>
+    <div class="seg" style="margin-bottom:0"><button class="${AUTH.via!=='email'?'on':''}" data-via="phone">Mobile</button><button class="${AUTH.via==='email'?'on':''}" data-via="email">Email</button></div>
+    ${AUTH.via==='email'?`<div class="fld"><label for="ae">Email</label><input class="f" id="ae" type="email" autocomplete="email" placeholder="you@example.com"><div class="ferr"></div></div>`
+      :`<div class="fld"><label for="ap">Mobile number</label><input class="f cd" id="ap" inputmode="tel" autocomplete="tel" placeholder="07X XXX XXXX"><div class="ferr"></div></div>`}
+    <button class="btn lg" id="acont" style="margin-top:14px">Continue</button>`;
+  if(s==='otp')body=`<h1 style="font-size:24px;margin:0;color:var(--ink);font-weight:500;text-align:center">Enter the 6-digit code</h1>
+    <p style="color:var(--muted);text-align:center;margin:8px 0 20px">Sent to <b style="color:var(--ink)">${esc(AUTH.id)}</b>. Demo code: <span class="mono">123456</span></p>
+    <div class="otp">${[0,1,2,3,4,5].map(i=>`<input maxlength="1" inputmode="numeric" data-i="${i}" aria-label="Digit ${i+1}">`).join('')}</div><div class="ferr" id="oerr" style="color:var(--err);font-size:13px;margin-top:8px;text-align:center"></div>
+    <button class="btn lg" id="over" style="margin-top:16px">Verify</button><button class="btn ghost lg" id="oback" style="margin-top:8px">Use a different ${AUTH.via==='email'?'email':'number'}</button>`;
+  if(s==='sso')body=`<div style="text-align:center"><div class="dlogo" style="background:var(--glass)">${AUTH.sso==='binance'?'<span class="pmi pm-binance" style="height:34px;min-width:34px;font-size:16px">B</span>':AUTH.sso==='google'?'<b style="color:#4285f4;font-size:28px">G</b>':''}</div>
+    <b style="color:var(--ink);font-weight:500;font-size:18px">${{google:'Google',apple:'Apple',binance:'Binance'}[AUTH.sso]} (demo)</b>
+    <p class="fine" style="font-size:14px;margin:8px 0 18px">CeyPay will receive your name and email. ${AUTH.sso==='binance'?'Signing in with Binance doesn’t give CeyPay access to your funds. You link it for payments separately.':''}</p></div>
+    <div class="fld"><label for="sn">Name</label><input class="f" id="sn" value="Nisal Chandrasekara"><div class="ferr"></div></div>
+    <div class="fld"><label for="se">Email</label><input class="f" id="se" type="email" value="hello@nisal.me"><div class="ferr"></div></div>
+    <button class="btn lg" id="sok" style="margin-top:16px">Allow and continue</button><button class="btn ghost lg" id="sno" style="margin-top:8px">Cancel</button>`;
+  if(s==='name')body=`<h1 style="font-size:24px;margin:0;color:var(--ink);font-weight:500;text-align:center">What’s your name?</h1><p style="color:var(--muted);text-align:center;margin:8px 0 10px">As it appears on your NIC or passport.</p>
+    <div class="fld"><label for="nn">Full name</label><input class="f" id="nn" autocomplete="name"><div class="ferr"></div></div>
+    ${AUTH.via==='email'?'':`<div class="fld"><label for="ne">Email (for receipts)</label><input class="f" id="ne" type="email" autocomplete="email"><div class="ferr"></div></div>`}
+    <button class="btn lg" id="nok" style="margin-top:16px">Create account</button>`;
+  return `<div class="auth"><div class="authc">${head}<div class="panel" style="padding:24px">${body}</div>
+    <p class="fine" style="text-align:center;margin-top:14px">By continuing you agree to CeyPay’s Terms of use and Privacy notice. Production sign-in is handled by Clerk.</p>
+    <p class="fine" style="text-align:center"><a href="#/info/safety" style="color:var(--text)">Safety</a> · <a href="#/rates" style="color:var(--text)">Today’s rates</a> · <span class="demo">DEMO</span></p></div></div>`};
+R.signin.after=()=>{const s=AUTH.step;
+  const finish=(user)=>{DB.user={...user,providers:[user.via],since:Date.now()};save();AUTH={step:'start'};toast('Signed in');const a=store.get('after',null);store.set('after',null);go(a&&!a.includes('signin')?a:'#/home')};
+  if(s==='start'){document.querySelectorAll('[data-sso]').forEach(b=>b.onclick=()=>{AUTH={step:'sso',sso:b.dataset.sso};render()});
+    document.querySelectorAll('[data-via]').forEach(b=>b.onclick=()=>{AUTH.via=b.dataset.via;render()});
+    const inp=$('ae')||$('ap');inp.focus();inp.onkeydown=e=>{if(e.key==='Enter')$('acont').click()};
+    $('acont').onclick=()=>{if(AUTH.via==='email'){const v=$('ae').value.trim();if(!field('ae',/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)?'':'Enter a valid email'))return;AUTH={step:'otp',via:'email',id:v}}
+      else{const v=$('ap').value.replace(/\s/g,'');if(!field('ap',/^(\+94|0)7\d{8}$/.test(v)?'':'Enter a Sri Lankan mobile, e.g. 077 123 4567'))return;AUTH={step:'otp',via:'phone',id:v}}render()}}
+  if(s==='otp'){const ins=[...document.querySelectorAll('.otp input')];ins[0].focus();
+    ins.forEach((x,i)=>{x.oninput=()=>{x.value=x.value.replace(/\D/g,'');if(x.value&&i<5)ins[i+1].focus();if(ins.every(y=>y.value))$('over').click()};x.onkeydown=e=>{if(e.key==='Backspace'&&!x.value&&i)ins[i-1].focus()};
+      x.onpaste=e=>{const d=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,6);if(d.length===6){e.preventDefault();d.split('').forEach((c,k)=>ins[k].value=c);$('over').click()}}});
+    $('over').onclick=()=>{const code=ins.map(x=>x.value).join('');if(code!=='123456'){$('oerr').textContent='That code isn’t right. Try 123456.';ins.forEach(x=>x.value='');ins[0].focus();return}
+      const known=store.get('known_'+AUTH.id,null);if(known)return finish(known);AUTH.step='name';render()};
+    $('oback').onclick=()=>{AUTH={step:'start',via:AUTH.via};render()}}
+  if(s==='sso'){$('sno').onclick=()=>{AUTH={step:'start'};render()};$('sok').onclick=()=>{const n=$('sn').value.trim(),e=$('se').value.trim();let ok=field('sn',n.split(/\s+/).length>=2?'':'Enter your first and last name');ok=field('se',/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)?'':'Enter a valid email')&&ok;if(ok)finish({name:n,email:e,via:AUTH.sso})}}
+  if(s==='name'){$('nn').focus();$('nok').onclick=()=>{const n=$('nn').value.trim();let ok=field('nn',n.split(/\s+/).length>=2?'':'Enter your first and last name');let e=AUTH.via==='email'?AUTH.id:$('ne').value.trim();
+    if(AUTH.via!=='email')ok=field('ne',!e||/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)?'':'Enter a valid email')&&ok;if(!ok)return;
+    const u={name:n,email:e||'',phone:AUTH.via==='phone'?AUTH.id:'',via:AUTH.via};store.set('known_'+AUTH.id,u);finish(u)}}};
+
+/* ================= HOME ================= */
+R.home=()=>{const u=DB.user,r=rate();const pts=FX_HIST,mn=Math.min(...pts)-.5,mx=Math.max(...pts)+.5,L=pts.length-1;
+  const path=pts.map((v,i)=>`${i?'L':'M'}${(i/L*300).toFixed(1)},${(44-(v-mn)/(mx-mn)*40).toFixed(1)}`).join(' ');const chg=pts[L]-pts[L-1];
+  const steps=[['Verify your identity','Needed to sell or send',DB.kyc==='verified','#/verify'],['Link an exchange account','Binance, Bybit or KuCoin',DB.methods.some(m=>m.type==='exchange'),'#/wallet/add/exchange'],['Add a card or JustPay','For bills and reloads',DB.methods.some(m=>m.type!=='exchange'),'#/wallet/add'],['Add your bank account','Where your rupees land',DB.payees.some(p=>p.is_self),'#/payee/new?self=1']];
+  const done=steps.filter(s=>s[2]).length;const up=DB.recurring.filter(x=>x.status==='active').map(x=>({...x,next:nextRun(x)})).sort((a,b)=>a.next-b.next).slice(0,3);
+  const exp=DB.methods.filter(isExpired);const empty=!DB.tx.length&&!DB.methods.length;
+  return `${phead('Home',`<span class="fine" style="display:flex;gap:8px;align-items:center">1 USD = <b class="mono" style="color:var(--ink)">LKR ${fmt(r)}</b> ${fxBadge()}</span>`)}<div class="pad">
+  <div style="font-size:28px;letter-spacing:-.8px;color:var(--ink);font-weight:500">Hi ${esc(u.name.split(' ')[0])}</div><p style="color:var(--muted);margin:4px 0 18px">What would you like to do today?</p>
+  ${exp.map(m=>`<div class="alert" style="margin:0 0 12px"><span class="ai">!</span><div>${esc(mName(m))} has expired.${DB.recurring.some(x=>x.method_id===m.id&&x.status==='active')?' A recurring payment uses it.':''}</div><a class="btn sm" href="#/wallet/${m.id}">Update</a></div>`).join('')}
+  <div class="qa"><a href="#/sell"><span class="ico2">${IC.sell}</span><b>Sell USDT</b><small>To your bank</small></a><a href="#/send"><span class="ico2">${IC.send}</span><b>Send money</b><small>To any bank</small></a><a href="#/recurring/new?type=bill"><span class="ico2">${IC.bill}</span><b>Pay bills</b><small>Set up autopay</small></a><a href="#/buy"><span class="ico2">${IC.buy}</span><b>Buy <span class="soon">Soon</span></b><small>Not available yet</small></a></div>
+  ${empty?`<div class="panel" style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b style="color:var(--ink);font-weight:500">New here? Explore with sample data</b><div class="fine">Fills your wallet, activity and recurring payments so you can see how it all works. You can reset it any time.</div></div><button class="btn" id="seed">Load sample data</button></div>`:''}
+  <div class="hgrid" style="margin-top:6px"><div>
+    ${done<4?`<div class="ptitle">Get set up<span style="text-transform:none;letter-spacing:0">${done} of 4</span></div><div class="panel setup"><div class="pbar"><i style="width:${done/4*100}%"></i></div>${steps.map(([t,s,ok,h],i)=>{const nx=!ok&&steps.slice(0,i).every(x=>x[2]);return `<div class="stp"><span class="ck ${ok?'done':''}">${ok?'✓':i+1}</span><div><b>${t}</b><small>${s}</small></div>${nx?`<a class="btn sm go" href="${h}">Start</a>`:''}</div>`}).join('')}</div>`:''}
+    <div class="ptitle">Recent activity${DB.tx.length?'<a href="#/activity">See all</a>':''}</div>
+    <div class="panel" style="padding:6px">${DB.tx.slice(0,5).map(t=>txRow(t,false,true)).join('')||'<div class="empty"><b>No activity yet</b>Your payments and transfers will show up here.</div>'}</div>
+  </div><div>
+    <div class="ptitle">Upcoming${up.length?'<a href="#/recurring">Manage</a>':''}</div>
+    <div class="panel" style="padding:6px">${up.map(x=>`<button class="lrow w3" onclick="go('#/recurring/${x.id}')">${cpLogo(x.cp)}<div style="min-width:0"><div class="nm">${esc(x.name)}</div><div class="fine">${dShort(x.next)} · ${esc(mName(M(x.method_id)))}</div></div><div class="lamt">${x.amount?lkr(x.amount):'Varies'}</div></button>`).join('')||`<div class="empty" style="padding:26px"><b>No recurring payments</b><a class="btn sm" href="#/recurring/new" style="margin-top:8px">Set one up</a></div>`}</div>
+    <div class="ptitle">Today’s rate<a href="#/rates">All rates</a></div>
+    <div class="panel"><div class="ratec"><div><div class="fine">1 USD / USDT · TT buying</div><div class="v">LKR ${fmt(r)}</div><div class="fine" style="color:${chg>0?'var(--ok)':chg<0?'var(--err)':'var(--muted)'}">${chg>0?'▲':chg<0?'▼':'•'} ${fmt(Math.abs(chg))} vs previous day</div></div>${fxBadge()}</div>
+      <svg class="spark" viewBox="0 0 300 46" preserveAspectRatio="none" role="img" aria-label="USD to LKR over 14 days"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+      <p class="fine" style="margin:6px 0 0">CeylonCash FX · as of ${fxDate()}</p></div>
+  </div></div>${legal()}</div>`};
+R.home.after=()=>{if($('seed'))$('seed').onclick=()=>{seed();toast('Sample data loaded');render()}};
+function nextRun(x){const d=new Date();const n=new Date(d.getFullYear(),d.getMonth(),x.day||1);if(n<=d)n.setMonth(n.getMonth()+1);if(x.freq==='weekly'){const w=new Date(d);w.setDate(d.getDate()+((7+(x.day%7)-d.getDay())%7||7));return +w}return +n}
+
+/* ================= ACTIVITY ================= */
+let ASEARCH='';
+function txRow(t,sel,compact){const m=M(t.method_id);const amt=t.lkr?lkr(t.lkr):t.quoted_lkr?lkr(t.quoted_lkr):'—';const bad=t.state!=='completed';
+  return `<button class="lrow ${compact?'w3':''} ${sel?'sel':''}" onclick="go('#/activity/${t.id}')">${cpLogo(t.cp)}<div style="min-width:0"><div class="nm">${esc(txTitle(t))}</div><div class="${compact?'fine':'lsub'}">${compact?`${dShort(t.created)} · ${esc(mName(m))}`:`${esc(mName(m))} · ${dShort(t.created)}`}</div></div>${compact?'':`<div class="c2">${pmIcon(m)} <span style="vertical-align:middle">${esc(mName(m))}</span></div><div class="c3">${dLong(t.created)}</div>`}<div class="lamt">${bad?`<span class="stat st-${t.state}" style="margin-right:8px;font-family:Geist,sans-serif">${stLabel(t.state)}</span>`:''}${t.kind==='sell'?'+':''}${amt}</div></button>`}
+R.activity=([id])=>{const q=ASEARCH.toLowerCase();const list=DB.tx.filter(t=>!q||(txTitle(t)+' '+mName(M(t.method_id))+' '+(t.account||'')+' '+t.id).toLowerCase().includes(q));
+  const groups={};list.forEach(t=>{const k=new Date(t.created).toLocaleDateString(undefined,{month:'short',year:'numeric'});(groups[k]=groups[k]||[]).push(t)});
+  const t=id&&DB.tx.find(x=>x.id===id);
+  return `${phead('Activity',`<label class="search">${IC.search}<input id="asq" placeholder="Search activity" value="${esc(ASEARCH)}" aria-label="Search activity"></label>`,id?'#/activity':null)}
+  <div class="md ${t?'sel':''}"><div class="list">${Object.entries(groups).map(([k,v])=>`<div class="lgrp">${k}</div>${v.map(x=>txRow(x,x.id===id)).join('')}`).join('')||`<div class="empty"><b>${q?'No matches':'No activity yet'}</b>${q?'Try another search.':'<a class="btn sm" href="#/sell" style="margin-top:8px">Sell USDT</a>'}</div>`}</div>
+  <aside class="detail">${t?txDetail(t):'<div class="dempty">Select a transaction to see the details</div>'}</aside></div>`};
+R.activity.after=([id])=>{const s=$('asq');s.oninput=()=>{ASEARCH=s.value;const p=s.selectionStart;render();const n=$('asq');n.focus();n.setSelectionRange(p,p)};
+  const t=id&&DB.tx.find(x=>x.id===id);if(!t)return;
+  if(LIVE(t.state))every(()=>{const p=t.state;advance(t);if(t.state!==p)render()},600);
+  if($('rn'))$('rn').onclick=()=>{const n=prompt('Rename this',txTitle(t));if(n!==null){DB.names[t.cp.key]=n.trim()||undefined;if(!n.trim())delete DB.names[t.cp.key];save();render()}};
+  if($('acc'))$('acc').onclick=()=>{advance(t,'accept');render()};if($('ref'))$('ref').onclick=()=>{advance(t,'refund');render()};
+  if($('shr'))$('shr').onclick=()=>{const s=`CeyPay ${t.id}: ${lkr(t.lkr)} · ${txTitle(t)} · ${dLong(t.created)}${t.bank_ref?' · Bank ref '+t.bank_ref:''}${t.biller_ref?' · Ref '+t.biller_ref:''}`;navigator.share?navigator.share({text:s}).catch(()=>{}):navigator.clipboard?.writeText(s).then(()=>toast('Receipt copied'))}};
+function timeline(t){const O=['charging','converting','paying_out','completed'];const i=O.indexOf(t.state),fi={charge_failed:0,rate_changed:1,refund_requested:1,payout_failed:2}[t.state]??-1;
+  const N=[['USDT collected',`${fmt(t.usdt)} USDT from ${esc(mName(M(t.method_id)))}`],['Converted to rupees',t.rate?`At LKR ${fmt(t.rate)} per USDT`:'At the protected rate'],['Sent by CEFT',`To ${esc(t.payee?.bank)} ${esc(t.payee?.account)}`],['Delivered',t.bank_ref?`Bank ref ${esc(t.bank_ref)}`:'Usually within minutes']];
+  return `<div class="prog" style="text-align:left">${N.map(([h,s],k)=>{let c='';if(fi===k)c='fail';else if(t.state==='completed'||k<(fi>=0?fi:i))c='done';else if(fi<0&&k===i)c='run';return `<div class="pst" style="align-items:flex-start"><span class="dt ${c}" style="margin-top:2px">${c==='done'?'✓':c==='fail'?'!':''}</span><div><div style="color:${c?'var(--ink)':'var(--muted)'}">${h}</div><div class="fine">${s}</div></div></div>`}).join('')}</div>`}
+function txDetail(t){const m=M(t.method_id);const same=DB.tx.filter(x=>x.cp.key===t.cp.key).length;const fx=t.kind==='sell'||t.kind==='remit';
+  return `<div class="dhead">${cpLogo(t.cp,true)}<div class="dtitle">${esc(txTitle(t))}<button id="rn" aria-label="Rename">${P('<path d="M4 20h4L20 8l-4-4L4 16z"/>')}</button></div><div class="dsub">${dTime(t.created)}</div><div class="dbig">${t.kind==='sell'?'+':''}${lkr(t.lkr||t.quoted_lkr)}</div></div>
+  ${fx&&t.state!=='completed'?`<div class="dcard" style="padding:6px 18px">${timeline(t)}</div>`:''}
+  ${t.state==='rate_changed'?`<div class="alert warn"><span class="ai">!</span><div>The rate moved after you paid. ${t.kind==='sell'?'You’d':'They’d'} now receive <b>${lkr(t.new_lkr)}</b> instead of ${lkr(t.quoted_lkr)}. Nothing has been sent yet.</div></div><button class="btn lg" id="acc" style="margin-top:10px">Accept ${lkr(t.new_lkr)}</button><button class="btn ghost lg" id="ref" style="margin-top:8px">Cancel and request a refund</button>`:''}
+  ${t.message&&!LIVE(t.state)&&t.state!=='completed'?`<div class="alert"><span class="ai">!</span><div>${esc(t.message)}</div></div>`:''}
+  <div class="dcard"><div class="drow"><span>Status</span><b class="k"><span class="stat st-${t.state}">${stLabel(t.state)}</span></b></div><div class="drow"><span>Payment</span><b>${esc(mName(m))}</b></div>
+    ${t.account?`<div class="drow"><span>${t.kind==='reload'?'Mobile':'Account'}</span><b class="mono">${esc(t.account)}</b></div>`:''}
+    ${t.payee?`<div class="drow"><span>${t.payee.self?'Paid to':'Recipient'}</span><b>${esc(t.payee.name)}</b></div><div class="drow"><span>Bank</span><b>${esc(t.payee.bank)} ${esc(t.payee.account)}</b></div>`:''}
+    ${t.purpose&&t.kind==='remit'?`<div class="drow"><span>Purpose</span><b>${esc(t.payee?.relationship)} · ${esc(t.purpose)}</b></div>`:''}</div>
+  <div class="dcard">${fx?`<div class="drow"><span>${t.kind==='sell'?'Sold':'Sent'}</span><b class="mono">${fmt(t.usdt)} USDT</b></div><div class="drow"><span>Fees</span><b class="mono">${fmt(t.fees_usdt)} USDT</b></div>${t.rate?`<div class="drow"><span>Rate</span><b class="mono">1 USDT = LKR ${fmt(t.rate)}</b></div>`:''}<div class="drow"><span>${t.kind==='sell'?'You received':'They received'}</span><b class="mono k">${lkr(t.lkr||0)}</b></div>`
+     :`<div class="drow"><span>Subtotal</span><b class="mono">${lkr(t.lkr)}</b></div><div class="drow"><span>Fee</span><b class="mono">${lkr(t.fee_lkr||0)}</b></div><div class="drow"><span>Total</span><b class="mono k">${lkr(t.lkr+(t.fee_lkr||0))}</b></div>`}
+    ${t.bank_ref?`<div class="drow"><span>Bank ref</span><b class="mono">${esc(t.bank_ref)}</b></div>`:''}${t.biller_ref?`<div class="drow"><span>Biller ref</span><b class="mono">${esc(t.biller_ref)}</b></div>`:''}<div class="drow"><span>CeyPay ref</span><b class="mono">${esc(t.id)}</b></div></div>
+  ${t.recurring_id&&DB.recurring.find(r=>r.id===t.recurring_id)?`<button class="dact" onclick="go('#/recurring/${t.recurring_id}')">${IC.recurring}Recurring payment<span class="r">${esc(DB.recurring.find(r=>r.id===t.recurring_id).plan)} ${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>`:''}
+  ${t.state==='completed'?`<button class="dact" id="shr">${IC.ext}${navigator.share?'Share receipt':'Copy receipt'}</button>`:''}
+  <button class="dact" onclick="go('#/info/faq')">${IC.help}Help<span class="r">${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>
+  <button class="dact" onclick="ASEARCH='${esc(txTitle(t)).replace(/'/g,'')}';go('#/activity')">${IC.hist}History<span class="r">${same} transaction${same===1?'':'s'} ${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>`}
+
+/* ================= RECURRING ================= */
+const recAmt=x=>x.amount?lkr(x.amount):'Varies with bill';
+R.recurring=([id],q)=>{if(id==='new')return R.recnew(q);const act=DB.recurring.filter(x=>x.status!=='canceled'),ina=DB.recurring.filter(x=>x.status==='canceled');const x=id&&DB.recurring.find(r=>r.id===id);
+  const row=r=>{const m=M(r.method_id);return `<button class="lrow r4 ${r.id===id?'sel':''}" onclick="go('#/recurring/${r.id}')">${cpLogo(r.cp)}<div style="min-width:0"><div class="nm">${esc(r.name)}</div><div class="lsub">${r.status==='canceled'?'Canceled':r.status==='paused'?'Paused':dShort(nextRun(r))} · ${esc(mName(m))}</div></div><div class="c2">${r.status==='canceled'?'Canceled':r.status==='paused'?'<span class="stat st-paused">Paused</span>':dShort(nextRun(r))}</div><div class="lamt">${r.amount?lkr(r.amount):'Varies'}</div></button>`};
+  return `${phead('Recurring',`<a class="btn" href="#/recurring/new">${IC.plus.replace('<svg','<svg style="width:16px;height:16px"')} New</a>`,id?'#/recurring':null)}
+  <div class="md ${x?'sel':''}"><div class="list">${DB.recurring.length?`<div class="lgrp">Active</div>${act.map(row).join('')||'<div class="fine" style="padding:8px 16px">None</div>'}${ina.length?`<div class="lgrp">Inactive</div>${ina.map(row).join('')}`:''}`
+    :`<div class="empty"><b>No recurring payments</b>Autopay your bills, top up a mobile every month, or send money home on a schedule.<br><a class="btn" href="#/recurring/new" style="margin-top:12px">Set up recurring</a></div>`}</div>
+  <aside class="detail">${x?recDetail(x):'<div class="dempty">Select a recurring payment to see the details</div>'}</aside></div>`};
+function recDetail(x){const m=M(x.method_id);const runs=DB.tx.filter(t=>t.recurring_id===x.id);const use=x.type==='remit'?'send':x.type;const opts=DB.methods.filter(pm=>USES[pm.type].includes(use));
+  return `<div class="dhead">${cpLogo(x.cp,true)}<div class="dtitle">${esc(x.name)}</div><div class="dsub">${esc(x.plan)}</div></div>
+  ${m&&isExpired(m)&&x.status!=='canceled'?`<div class="alert"><span class="ai">!</span><div>The card for this payment has expired</div><button class="btn sm" id="chg2">Change</button></div>`:''}
+  <div class="dcard"><div class="drow"><span>${x.status==='canceled'?'Status':'Expected on'}</span><b>${x.status==='canceled'?'Canceled '+(x.canceled?dShort(x.canceled):''):x.status==='paused'?'Paused':dLong(nextRun(x))}</b></div>
+  <div class="drow"><span>Details</span><b>${x.amount?lkr(x.amount)+(x.freq==='weekly'?' weekly':' monthly'):'Varies with usage'+(x.cap?` · up to ${lkr(x.cap)}`:'')}</b></div>
+  ${x.account?`<div class="drow"><span>${x.type==='reload'?'Mobile':'Account'}</span><b class="mono">${esc(x.account)}</b></div>`:''}
+  <div class="drow"><span>Payment</span><b>${x.status==='canceled'?esc(mName(m)):`<select class="f" id="rpm" style="height:32px;width:auto;max-width:210px;padding:0 28px 0 8px;font-size:13px">${opts.map(pm=>`<option value="${pm.id}" ${pm.id===x.method_id?'selected':''} ${mStatus(pm)!=='active'?'disabled':''}>${esc(mName(pm))}${mStatus(pm)!=='active'?' (expired)':''}</option>`).join('')}</select>`}</b></div></div>
+  ${x.status!=='canceled'?`<button class="dact" id="rnow">${IC.bolt}Pay now<span class="r">${recAmt(x)}</span></button>
+  <div class="dgroup"><button class="dact" id="rpause">${x.status==='paused'?IC.play+'Resume':IC.pause+'Pause'}</button><button class="dact danger" id="rcancel">${IC.x}Cancel recurring payment</button></div>`
+  :`<button class="dact" onclick="go('#/recurring/new?type=${x.type}')">${IC.plus}Set up again</button>`}
+  <button class="dact" onclick="ASEARCH='${esc(x.name).replace(/'/g,'')}';go('#/activity')">${IC.hist}History<span class="r">${runs.length} payment${runs.length===1?'':'s'} ${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>
+  <button class="dact" onclick="go('#/info/faq')">${IC.store}Contact support<span class="r">${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>`}
+R.recurring.after=([id],q)=>{if(id==='new')return R.recnew.after(q);const x=id&&DB.recurring.find(r=>r.id===id);if(!x)return;
+  if($('rpm'))$('rpm').onchange=()=>{x.method_id=$('rpm').value;save();toast('Payment method updated');render()};
+  if($('chg2'))$('chg2').onclick=()=>$('rpm').focus();
+  if($('rpause'))$('rpause').onclick=()=>{x.status=x.status==='paused'?'active':'paused';save();toast(x.status==='paused'?'Paused':'Resumed');render()};
+  if($('rcancel'))$('rcancel').onclick=e=>{if(!armed($('rcancel'),'Tap again to cancel'))return;x.status='canceled';x.canceled=Date.now();save();toast('Canceled');render()};
+  if($('rnow'))$('rnow').onclick=()=>{const m=M(x.method_id);if(!m||mStatus(m)!=='active')return toast('Choose a valid payment method first');
+    if(x.type==='remit'){const p=DB.payees.find(p=>p.id===x.payee_id);draft.tab='send';draft.incur='LKR';draft.amount=String(x.amount);draft.payee.send=p?.id;draft.account=m.id;go('#/send');return}
+    const amt=x.amount||Math.round((2000+Math.random()*9000)/10)*10;const t=newTx({kind:x.type,cp:x.cp,method_id:m.id,lkr:amt,fee_lkr:CFG.bill_fee,account:x.account,state:'processing',recurring_id:x.id});go('#/activity/'+t.id)}};
+
+/* new recurring */
+R.recnew=(q)=>{const type=q.get('type')||'bill';const T=(k,l,i)=>`<a class="tile ${type===k?'on':''}" href="#/recurring/new?type=${k}"><span style="color:var(--blue)">${i}</span><b>${l}</b></a>`;
+  const methods=(use)=>{const l=DB.methods.filter(m=>USES[m.type].includes(use)&&mStatus(m)==='active');const d=defaultFor(use);
+    return l.length?`<select class="f" id="nm_">${l.map(m=>`<option value="${m.id}" ${m.id===d?.id?'selected':''}>${esc(mName(m))}</option>`).join('')}</select>`:`<a class="row need" href="#/wallet/add?ret=${encodeURIComponent('recurring/new?type='+type)}"><span class="av">＋</span><div><b>Add a payment method</b><small>${use==='send'?'Link an exchange account':'Card, JustPay or exchange'}</small></div></a>`};
+  let f='';
+  if(type==='bill')f=`<div class="fld"><label for="nb">Biller</label><select class="f" id="nb">${BILLERS.map(b=>`<option value="${b.code}">${esc(b.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="na">Account number</label><input class="f cd" id="na" inputmode="numeric"><div class="ferr"></div></div>
+    <div class="fld"><label for="nc">Pay the full bill each month, up to (LKR)</label><input class="f cd" id="nc" type="number" value="20000"><div class="ferr"></div><div class="fine" style="margin-top:5px">If a bill is higher than this, we’ll ask you before paying.</div></div>
+    <div class="fld"><label>Pay with</label>${methods('bill')}</div>`;
+  if(type==='reload')f=`<div class="fld"><label for="na">Mobile number</label><input class="f cd" id="na" inputmode="tel" placeholder="07X XXX XXXX"><div class="ferr"></div><div class="fine" id="nop" style="margin-top:5px"></div></div>
+    <div class="fld"><label for="nv">Amount (LKR)</label><input class="f cd" id="nv" type="number" value="500"><div class="ferr"></div></div>
+    <div class="two"><div class="fld"><label for="nf">Every</label><select class="f" id="nf"><option value="monthly">Month</option><option value="weekly">Week</option></select></div><div class="fld"><label for="nd">On day</label><input class="f cd" id="nd" type="number" min="1" max="28" value="1"></div></div>
+    <div class="fld"><label>Pay with</label>${methods('reload')}</div>`;
+  if(type==='remit'){const ps=DB.payees.filter(p=>!p.is_self);f=DB.kyc!=='verified'?`<div class="gate"><span class="av">ID</span><div><b>Verify your identity first</b><div class="fine">Required by law before sending money.</div></div><a class="btn sm" href="#/verify?ret=${encodeURIComponent('recurring/new?type=remit')}" style="margin-left:auto">Verify</a></div>`:
+    `<div class="fld"><label for="np">Recipient</label>${ps.length?`<select class="f" id="np">${ps.map(p=>`<option value="${p.id}">${esc(p.nickname||p.account_name)} · ${esc(bankShort(p.bank_name))} ${mask4(p.account_number)}</option>`).join('')}</select>`:`<a class="row need" href="#/payee/new?ret=${encodeURIComponent('recurring/new?type=remit')}"><span class="av">＋</span><div><b>Add a recipient</b></div></a>`}</div>
+    <div class="fld"><label for="nv">They receive (LKR)</label><input class="f cd" id="nv" type="number" value="25000"><div class="ferr"></div></div>
+    <div class="two"><div class="fld"><label for="nd">Every month on day</label><input class="f cd" id="nd" type="number" min="1" max="28" value="28"></div><div class="fld"><label for="nu">Purpose</label><select class="f" id="nu">${CFG.purposes.map(p=>`<option>${p}</option>`).join('')}</select></div></div>
+    <div class="fld"><label>Pay from</label>${methods('send')}</div><p class="fine" style="margin-top:10px">We’ll ask you to confirm the rate before each transfer goes out.</p>`}
+  return `${phead('New recurring payment','', '#/recurring')}<div class="pad"><div class="col">
+  <div class="tiles">${T('bill','Bill autopay',IC.bill)}${T('reload','Mobile reload',IC.phone)}${T('remit','Send money',IC.send)}</div>
+  <div class="panel" style="margin-top:14px">${f}<button class="btn lg" id="nsave" style="margin-top:18px">Start recurring payment</button></div></div></div>`};
+R.recnew.after=(q)=>{const type=q.get('type')||'bill';if(!$('nsave'))return;
+  if($('na')&&type==='reload')$('na').oninput=()=>{const d=$('na').value.replace(/\D/g,'');$('nop').textContent=OPS[d.slice(0,3)]?OPS[d.slice(0,3)]+' detected':''};
+  $('nsave').onclick=()=>{const pm=$('nm_')?.value;if(!pm)return toast('Add a payment method first');let r={id:uid('rc_'),type,freq:'monthly',method_id:pm,status:'active',created:Date.now()};
+    if(type==='bill'){const b=BILLERS.find(x=>x.code===$('nb').value),a=$('na').value.replace(/\s/g,''),c=Number($('nc').value);let ok=field('na',/^\d{6,14}$/.test(a)?'':'Enter the account number on your bill');ok=field('nc',c>=100?'':'Enter at least LKR 100')&&ok;if(!ok)return;
+      Object.assign(r,{name:b.name,cp:{kind:'biller',code:b.code,name:b.name,key:b.code},plan:'Monthly autopay',account:a,amount:b.varies?null:Math.min(c,2500),cap:c,day:12})}
+    if(type==='reload'){const a=$('na').value.replace(/\D/g,''),v=Number($('nv').value),op=OPS[a.slice(0,3)];let ok=field('na',/^07\d{8}$/.test(a)&&op?'':'Enter a Sri Lankan mobile number');ok=field('nv',v>=50?'':'Minimum LKR 50')&&ok;if(!ok)return;
+      Object.assign(r,{name:op+' reload',cp:{kind:'biller',code:op,name:op,key:op.toUpperCase()+'_RL'},plan:`${$('nf').value==='weekly'?'Weekly':'Monthly'} · ${a.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3')}`,account:a,amount:v,freq:$('nf').value,day:Number($('nd').value)||1})}
+    if(type==='remit'){const p=DB.payees.find(x=>x.id===$('np')?.value),v=Number($('nv').value);if(!p)return toast('Add a recipient first');if(!field('nv',v>=1000?'':'Minimum LKR 1,000'))return;
+      Object.assign(r,{name:p.nickname||p.account_name,cp:{kind:'person',name:p.nickname||p.account_name,key:'p:'+p.id},plan:'Monthly · '+$('nu').value,payee_id:p.id,amount:v,purpose:$('nu').value,day:Number($('nd').value)||28})}
+    DB.recurring.unshift(r);save();toast('Recurring payment set up');go('#/recurring/'+r.id)}};
+
+/* ================= WALLET ================= */
+R.wallet=([id,sub],q)=>{if(id==='add')return R.addpm(sub,q);const groups=[['exchange','Exchange accounts'],['justpay','JustPay bank accounts'],['card','Cards']];const m=id&&M(id);
+  const row=pm=>`<button class="lrow w3 ${pm.id===id?'sel':''}" onclick="go('#/wallet/${pm.id}')">${pmIcon(pm)}<div style="min-width:0"><div class="nm">${esc(mName(pm))}${pm.id===DB.defaultId?' <span class="stat st-completed" style="margin-left:6px">Default</span>':''}</div><div class="lsub">${pm.type==='card'?'Expires '+pm.exp:pm.type==='justpay'?'Up to '+lkr(pm.limit)+' per payment':'Up to '+pm.per_txn_limit+' USDT per transfer'}</div></div><div class="lamt">${isExpired(pm)?`<span style="color:var(--err)">${P('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',2).replace('<svg','<svg style="width:22px;height:22px"')}</span>`:''}</div></button>`;
+  return `${phead('Wallet',`<a class="ib" href="#/wallet/add" aria-label="Add payment method" title="Add payment method">${IC.plus}</a>`,id?'#/wallet':null)}
+  <div class="md ${m?'sel':''}"><div class="list">${DB.methods.length?groups.map(([k,l])=>{const v=DB.methods.filter(x=>x.type===k);return v.length?`<div class="lgrp">${l}</div>${v.map(row).join('')}`:''}).join('')+`<a class="lrow w3" href="#/wallet/add" style="color:var(--blue)"><span class="lo" style="background:var(--blue-soft);color:var(--blue)">${IC.plus}</span><div class="nm" style="color:var(--blue)">Add payment method</div><span></span></a>`
+    :`<div class="empty"><b>Your wallet is empty</b>Link Binance, Bybit or KuCoin, add a card, or connect your bank with JustPay.<br><a class="btn" href="#/wallet/add" style="margin-top:12px">Add payment method</a></div>`}</div>
+  <aside class="detail">${m?pmDetail(m):'<div class="dempty">Select a payment method to see the details</div>'}</aside></div>`};
+function cardVis(m){const exp=isExpired(m);if(m.type==='card')return `<div class="cvis cv-card ${m.brand} ${exp?'exp':''}"><div class="t"><span>${esc(m.issuer||'')}</span><span>${m.funding}</span></div><div class="cnum">•••• •••• •••• ${m.last4}</div><div class="b"><span>${esc(m.holder||'')}<br>${m.exp}</span><span class="brand">${{visa:'VISA',mastercard:'mastercard',amex:'AMEX'}[m.brand]}</span></div></div>`;
+  if(m.type==='justpay')return `<div class="cvis cv-justpay"><div class="t"><span>${esc(m.bank)}</span><span>JustPay</span></div><div class="cnum">•••• ${m.last4}</div><div class="b"><span>${esc(DB.user.name)}<br>${esc(m.mobile.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</span><span class="brand" style="font-size:15px">LankaClear</span></div></div>`;
+  return `<div class="cvis cv-${m.provider}"><div class="t"><span>CeyPay Direct Debit</span><span>USDT</span></div><div class="cnum">${esc(m.label)}</div><div class="b"><span>Up to ${m.per_txn_limit} USDT / transfer<br>${fmt(spentBy(m.id,30),0)} / ${m.monthly_limit} this month</span><span class="brand">${EX[m.provider]}</span></div></div>`}
+function pmDetail(m){const st=mStatus(m);const n=DB.tx.filter(t=>t.method_id===m.id).length;const rec=DB.recurring.filter(r=>r.method_id===m.id&&r.status!=='canceled').length;
+  return `<div class="dhead">${cardVis(m)}<div class="dtitle">${esc(m.nick||(m.type==='card'?`${m.brandName} ${m.funding}`:m.type==='justpay'?'JustPay':EX[m.provider]))}<button id="pnick" aria-label="Rename">${P('<path d="M4 20h4L20 8l-4-4L4 16z"/>')}</button></div><div class="dsub mono">${m.type==='exchange'?esc(m.label):'•••• '+m.last4}</div></div>
+  ${st==='expired'?`<div class="alert"><span class="ai">!</span><div>Card has expired</div><button class="btn sm" id="pupd">Update</button></div>`:''}
+  <div id="updBox"></div>
+  <div class="dcard"><div class="drow"><span>Used for</span><b><span class="pmgrid" style="justify-content:flex-end">${Object.keys(USE_L).map(u=>`<span class="uchip ${USES[m.type].includes(u)?'':'off'}">${USE_L[u]}</span>`).join('')}</span></b></div>
+   ${m.type==='card'?`<div class="drow"><span>Billing address</span><b>${esc(m.billing||'—')}</b></div><div class="drow"><span>Issuer</span><b>${esc(m.issuer||'—')}</b></div>`:''}
+   ${m.type==='justpay'?`<div class="drow"><span>Registered mobile</span><b class="mono">${esc(m.mobile)}</b></div><div class="drow"><span>Limit per payment</span><b>${lkr(m.limit)}</b></div>`:''}
+   ${m.type==='exchange'?`<div class="drow"><span>Per transfer</span><b>${m.per_txn_limit} USDT</b></div><div class="drow"><span>This month</span><b>${fmt(spentBy(m.id,30),0)} / ${m.monthly_limit} USDT</b></div>`:''}
+   <div class="drow"><span>Added</span><b>${dLong(m.created)}</b></div></div>
+  <div class="dgroup">
+   <div class="dact" style="cursor:default">${IC.heart}Set as default<span class="r"><button class="tgl ${DB.defaultId===m.id?'on':''}" id="pdef" ${st!=='active'?'disabled':''} aria-label="Set as default" aria-pressed="${DB.defaultId===m.id}"></button></span></div>
+   ${m.type==='card'?`<button class="dact" id="pupd2">${IC.card}Update card<span class="r">${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>`:''}
+   ${m.type==='exchange'?`<button class="dact" id="plim">${IC.shield}Change limits<span class="r">${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button>`:''}
+   <button class="dact danger" id="prem">${IC.x}Remove${rec?`<span class="r">${rec} recurring</span>`:''}</button>
+   <button class="dact" onclick="ASEARCH='${esc(mName(m)).replace(/'/g,'')}';go('#/activity')">${IC.hist}History<span class="r">${n} transaction${n===1?'':'s'} ${IC.chev.replace('<svg','<svg style="width:16px;height:16px"')}</span></button></div>
+  <p class="fine" style="margin-top:14px">${m.type==='card'?'Card details are tokenised by Pay&amp;Go. CeyPay never stores your full card number or CVC. Cards can’t be used to buy or sell digital assets.':m.type==='justpay'?'JustPay (LankaClear) lets CeyPay collect rupees from your own bank account, with your approval in your bank app.':'CeyPay can collect USDT only within the limits of the contract you signed in '+EX[m.provider]+'. You can cancel it there at any time.'}</p>`}
+R.wallet.after=([id,sub],q)=>{if(id==='add')return R.addpm.after(sub,q);const m=id&&M(id);if(!m)return;
+  $('pnick').onclick=()=>{const n=prompt('Name this payment method',m.nick||'');if(n!==null){m.nick=n.trim()||undefined;save();render()}};
+  if($('pdef'))$('pdef').onclick=()=>{DB.defaultId=DB.defaultId===m.id?null:m.id;save();toast(DB.defaultId?'Default updated':'Default removed');render()};
+  const upd=()=>{$('updBox').innerHTML=`<div class="dcard" style="padding:14px 18px"><b style="color:var(--ink);font-weight:500">Update expiry</b><div class="two"><div class="fld"><label for="ue">New expiry (MM/YY)</label><input class="f cd" id="ue" placeholder="MM/YY" inputmode="numeric"><div class="ferr"></div></div><div class="fld"><label for="uc">CVC</label><input class="f cd" id="uc" inputmode="numeric" maxlength="4"><div class="ferr"></div></div></div><button class="btn lg" id="usv" style="margin-top:12px">Save</button></div>`;
+    $('ue').oninput=()=>{let v=$('ue').value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);$('ue').value=v};$('ue').focus();
+    $('usv').onclick=()=>{const e=$('ue').value;let ok=field('ue',validExp(e)?'':'Enter a future date, e.g. 09/29');ok=field('uc',/^\d{3,4}$/.test($('uc').value)?'':'Enter the 3 or 4 digits on the back')&&ok;if(!ok)return;m.exp=e;save();toast('Card updated');render()}};
+  if($('pupd'))$('pupd').onclick=upd;if($('pupd2'))$('pupd2').onclick=upd;
+  if($('plim'))$('plim').onclick=()=>{$('updBox').innerHTML=`<div class="dcard" style="padding:14px 18px"><b style="color:var(--ink);font-weight:500">Change limits</b><p class="fine" style="margin:4px 0 0">Raising the per-transfer limit needs a new signature in ${EX[m.provider]}.</p><div class="two"><div class="fld"><label for="lt">Per transfer (USDT)</label><input class="f cd" id="lt" type="number" value="${m.per_txn_limit}"><div class="ferr"></div></div><div class="fld"><label for="lm">Per month (USDT)</label><input class="f cd" id="lm" type="number" value="${m.monthly_limit}"><div class="ferr"></div></div></div><button class="btn lg" id="lsv" style="margin-top:12px">Save</button></div>`;
+    $('lsv').onclick=()=>{const t=Number($('lt').value),mo=Number($('lm').value);let ok=field('lt',t>=CFG.min_usdt?'':`At least ${CFG.min_usdt} USDT`);ok=field('lm',mo>=t?'':'Must be at least the per-transfer limit')&&ok;if(!ok)return;const raised=t>m.per_txn_limit;m.per_txn_limit=t;m.monthly_limit=mo;save();toast(raised?`Approved in ${EX[m.provider]} (demo)`:'Limits updated');render()}};
+  $('prem').onclick=()=>{if(!armed($('prem'),'Tap again to remove'))return;DB.methods=DB.methods.filter(x=>x.id!==m.id);if(DB.defaultId===m.id)DB.defaultId=null;save();toast('Removed');go('#/wallet')}};
+const validExp=e=>{if(!/^\d{2}\/\d{2}$/.test(e))return false;const [mm,yy]=e.split('/').map(Number);return mm>=1&&mm<=12&&new Date(2000+yy,mm,1)>new Date()};
+const luhn=n=>{let s=0,alt=false;for(let i=n.length-1;i>=0;i--){let d=+n[i];if(alt){d*=2;if(d>9)d-=9}s+=d;alt=!alt}return s%10===0};
+const brandOf=n=>/^4/.test(n)?'visa':/^(5[1-5]|2(2[2-9]|[3-6]\d|7[01]|720))/.test(n)?'mastercard':/^3[47]/.test(n)?'amex':null;
+
+/* add payment method */
+let ADD={};
+R.addpm=(type,q)=>{if(!type)ADD={};const ret=q.get('ret');const back=ret?'#/'+ret:'#/wallet';
+  if(!type)return `${phead('Add payment method','',back)}<div class="pad"><div class="col">
+    <div class="tiles">
+     <a class="tile" href="#/wallet/add/exchange${ret?'?ret='+encodeURIComponent(ret):''}"><span class="pmgrid"><span class="pmi pm-binance">B</span><span class="pmi pm-bybit">B</span><span class="pmi pm-kucoin">K</span></span><b>Exchange account</b><small>Binance, Bybit or KuCoin. Sell, send and pay in USDT.</small></a>
+     <a class="tile" href="#/wallet/add/justpay${ret?'?ret='+encodeURIComponent(ret):''}"><span class="pmgrid"><span class="pmi pm-justpay">JustPay</span></span><b>Bank account</b><small>Connect your bank with JustPay. Pay bills in rupees, with no card needed.</small></a>
+     <a class="tile" href="#/wallet/add/card${ret?'?ret='+encodeURIComponent(ret):''}"><span class="pmgrid"><span class="pmi pm-visa">VISA</span><span class="pmi pm-mastercard">MC</span><span class="pmi pm-amex">AMEX</span></span><b>Debit or credit card</b><small>Visa, Mastercard or Amex, for bills and reloads.</small></a>
+    </div>
+    <div class="panel" style="margin-top:14px"><div class="kv"><span>Sell or send USDT</span><b>Exchange account</b></div><div class="kv"><span>Pay bills and reloads</span><b>Any method</b></div><div class="kv"><span>Buy USDT (coming soon)</span><b>JustPay bank account only</b></div></div></div></div>`;
+  if(type==='card'){if(ADD.step==='3ds')return `${phead('Verify with your bank','',back)}<div class="pad"><div class="col"><div class="panel" style="text-align:center">
+      <div class="dlogo" style="background:var(--glass)">${IC.shield}</div><b style="color:var(--ink);font-weight:500;font-size:17px">${esc(ADD.issuer)} secure check</b>
+      <p class="fine" style="font-size:14px;margin:8px 0 16px">Enter the one-time code sent to your phone to confirm the card is yours. We verify with a LKR 0 check; you won’t be charged. Demo code: <span class="mono">123456</span></p>
+      <div class="fld" style="text-align:left"><label for="tc">Code</label><input class="f cd" id="tc" inputmode="numeric" maxlength="6"><div class="ferr"></div></div>
+      <button class="btn lg" id="tok" style="margin-top:14px">Confirm</button></div></div></div>`;
+    return `${phead('Add a card','',ret?back:'#/wallet/add')}<div class="pad"><div class="col"><div id="cprev"></div><div class="panel">
+      <div class="fld" style="margin-top:0"><label for="cn">Card number</label><input class="f cd" id="cn" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456"><div class="ferr"></div></div>
+      <div class="three"><div class="fld"><label for="ch">Name on card</label><input class="f" id="ch" autocomplete="cc-name" value="${esc(DB.user.name)}"><div class="ferr"></div></div><div class="fld"><label for="ce">Expiry</label><input class="f cd" id="ce" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY"><div class="ferr"></div></div><div class="fld"><label for="cc">CVC</label><input class="f cd" id="cc" inputmode="numeric" autocomplete="cc-csc" maxlength="4"><div class="ferr"></div></div></div>
+      <div class="fld"><label for="cb">Billing address</label><input class="f" id="cb" autocomplete="street-address" placeholder="House no., street, city"><div class="ferr"></div></div>
+      <label class="chk"><input type="checkbox" id="cdef">Make this my default for bills and reloads</label>
+      <button class="btn lg" id="csv" style="margin-top:16px">Add card</button>
+      <p class="fine" style="margin:12px 0 0">🔒 Card details are tokenised by Pay&amp;Go (PCI DSS). CeyPay never stores your full card number or CVC. Try 4242 4242 4242 4242.</p></div></div></div>`}
+  if(type==='justpay'){if(ADD.step==='approve')return `${phead('Approve in your bank app','',back)}<div class="pad"><div class="col"><div class="panel" style="text-align:center">
+      <div class="dlogo pm-justpay" style="font-size:14px">JustPay</div><b style="color:var(--ink);font-weight:500;font-size:17px">${esc(ADD.bank)}</b>
+      <p class="fine" style="font-size:14px;margin:8px 0 16px">Open your ${esc(bankShort(ADD.bank))} app and approve the JustPay request from <b style="color:var(--ink)">CeyPay</b> for account ending ${ADD.last4}, up to ${lkr(ADD.limit)} per payment. You can cancel it in your bank app at any time.</p>
+      <div class="prog" style="text-align:left"><div class="pst"><span class="dt done">✓</span>Request sent to ${esc(bankShort(ADD.bank))}</div><div class="pst"><span class="dt run"></span>Waiting for your approval</div></div>
+      <button class="btn lg" id="jok">I’ve approved it (demo)</button><button class="btn ghost lg" id="jno" style="margin-top:8px">Cancel</button></div></div></div>`;
+    return `${phead('Connect a bank with JustPay','',ret?back:'#/wallet/add')}<div class="pad"><div class="col"><div class="panel">
+      <div class="fld" style="margin-top:0"><label for="jb">Bank</label><select class="f" id="jb"><option value="">Choose bank</option>${BANKS.map(b=>`<option value="${b.code}">${esc(b.name)}</option>`).join('')}</select><div class="ferr"></div></div>
+      <div class="fld"><label for="ja">Account number</label><input class="f cd" id="ja" inputmode="numeric"><div class="ferr"></div><div class="fine" style="margin-top:5px">Must be in your name: ${esc(DB.user.name)}.</div></div>
+      <div class="two"><div class="fld"><label for="jm">Mobile registered with the bank</label><input class="f cd" id="jm" inputmode="tel" value="${esc(DB.user.phone||'')}" placeholder="07X XXX XXXX"><div class="ferr"></div></div><div class="fld"><label for="jn">NIC number</label><input class="f cd" id="jn" placeholder="200012345678"><div class="ferr"></div></div></div>
+      <div class="fld"><label for="jl">Limit per payment (LKR)</label><input class="f cd" id="jl" type="number" value="100000"><div class="ferr"></div></div>
+      <button class="btn lg" id="jsv" style="margin-top:16px">Continue to your bank</button>
+      <p class="fine" style="margin:12px 0 0">JustPay is LankaClear’s account-to-account service. CeyPay can collect only the payments you confirm, within your limit.</p></div></div></div>`}
+  if(type==='exchange'){const p=ADD.prov||'binance';if(ADD.step==='sign')return `${phead(`Approve in ${EX[p]}`,'',back)}<div class="pad"><div class="col"><div class="panel" style="text-align:center">
+      <div class="dlogo pm-${p}" style="font-size:26px">${EX[p][0]}</div><b style="color:var(--ink);font-weight:500;font-size:17px">CeyPay requests a Direct Debit contract</b>
+      <p class="fine" style="font-size:14px;margin:8px 0 16px">Up to <b style="color:var(--ink)">${ADD.per} USDT</b> per payment. CeyPay never sees your ${EX[p]} password or API keys. You can cancel the contract in ${EX[p]} at any time.</p>
+      <button class="btn lg" id="xok">Sign contract (demo)</button><button class="btn ghost lg" id="xno" style="margin-top:8px">Cancel</button></div></div></div>`;
+    return `${phead('Link an exchange account','',ret?back:'#/wallet/add')}<div class="pad"><div class="col"><div class="panel">
+      <div class="xgrid">${Object.keys(EX).map(x=>`<button class="xpick ${x===p?'on':''}" data-p="${x}"><span class="pmi pm-${x}" style="height:30px;min-width:30px;font-size:13px">${EX[x][0]}</span>${EX[x]}</button>`).join('')}</div>
+      <div class="fld"><label for="xl">Nickname</label><input class="f" id="xl" placeholder="e.g. Main" maxlength="40" value="${esc(ADD.label||'')}"></div>
+      <div class="two"><div class="fld"><label for="xt">Max per transfer (USDT)</label><input class="f cd" id="xt" type="number" value="${ADD.per||500}"><div class="ferr"></div></div><div class="fld"><label for="xm">Max per month (USDT)</label><input class="f cd" id="xm" type="number" value="${ADD.mon||2000}"><div class="ferr"></div></div></div>
+      <button class="btn lg" id="xsv" style="margin-top:16px">Continue to ${EX[p]}</button></div></div></div>`}
+  return ''};
+R.addpm.after=(type,q)=>{const ret=q.get('ret');const done=(m,msg)=>{DB.methods.push(m);if(!DB.defaultId||m._def){DB.defaultId=m.id}delete m._def;save();ADD={};toast(msg);go(ret?'#/'+ret:'#/wallet/'+m.id)};
+  if(type==='card'){
+    if(ADD.step==='3ds'){$('tc').focus();$('tok').onclick=()=>{if(!field('tc',$('tc').value==='123456'?'':'That code isn’t right. Try 123456.'))return;const {step,...m}=ADD;done({...m,id:uid('pm_'),type:'card',created:Date.now()},`${m.brandName} ${m.last4} added`)};return}
+    const prev=()=>{const n=$('cn').value.replace(/\D/g,''),b=brandOf(n)||'visa';$('cprev').innerHTML=cardVis({type:'card',brand:b,funding:'',last4:(n.slice(-4)||'••••').padStart(4,'•'),exp:$('ce').value||'MM/YY',holder:$('ch').value,issuer:''}).replace('•••• •••• •••• ',(n.length>4?n.slice(0,-4).replace(/(\d{4})/g,'$1 ').replace(/\d/g,'•'):'•••• •••• •••• '))};
+    $('cn').oninput=()=>{const n=$('cn').value.replace(/\D/g,'').slice(0,19);$('cn').value=n.replace(/(\d{4})(?=\d)/g,'$1 ');prev()};
+    $('ce').oninput=()=>{let v=$('ce').value.replace(/\D/g,'').slice(0,4);if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);$('ce').value=v;prev()};$('ch').oninput=prev;prev();$('cn').focus();
+    $('csv').onclick=()=>{const n=$('cn').value.replace(/\D/g,''),b=brandOf(n),e=$('ce').value,c=$('cc').value;
+      let ok=field('cn',!b?'We accept Visa, Mastercard and Amex':!luhn(n)||n.length<13?'That card number isn’t valid':DB.methods.some(m=>m.type==='card'&&m.last4===n.slice(-4)&&m.brand===b)?'This card is already in your wallet':'');
+      ok=field('ch',$('ch').value.trim().length>2?'':'Enter the name on the card')&&ok;ok=field('ce',validExp(e)?'':'Enter a future date, MM/YY')&&ok;ok=field('cc',new RegExp(`^\\d{${b==='amex'?4:3}}$`).test(c)?'':`Enter the ${b==='amex'?4:3} digits`)&&ok;ok=field('cb',$('cb').value.trim().length>4?'':'Enter your billing address')&&ok;if(!ok)return;
+      ADD={step:'3ds',brand:b,brandName:{visa:'Visa',mastercard:'Mastercard',amex:'Amex'}[b],funding:+n.slice(-1)%2?'Credit':'Debit',last4:n.slice(-4),exp:e,holder:$('ch').value.trim(),billing:$('cb').value.trim(),issuer:['Commercial Bank','Sampath Bank','HNB','BOC'][+n[6]%4],_def:$('cdef').checked};render()}}
+  if(type==='justpay'){
+    if(ADD.step==='approve'){$('jno').onclick=()=>{ADD={};render()};$('jok').onclick=async()=>{$('jok').disabled=true;$('jok').textContent='Confirming…';await sleep(700);const {step,...m}=ADD;done({...m,id:uid('pm_'),type:'justpay',created:Date.now()},'Bank connected with JustPay')};return}
+    $('jsv').onclick=()=>{const b=BANKS.find(x=>x.code==$('jb').value),a=$('ja').value.replace(/\s/g,''),mo=$('jm').value.replace(/\s/g,''),nic=$('jn').value.trim(),l=Number($('jl').value);
+      let ok=field('jb',b?'':'Choose your bank');ok=field('ja',/^\d{6,20}$/.test(a)?'':'Account number should be 6 to 20 digits')&&ok;ok=field('jm',/^(\+94|0)7\d{8}$/.test(mo)?'':'Enter the mobile registered with your bank')&&ok;
+      ok=field('jn',/^(\d{9}[vVxX]|\d{12})$/.test(nic)?'':'Enter a valid NIC (old or new format)')&&ok;ok=field('jl',l>=1000?'':'At least LKR 1,000')&&ok;if(!ok)return;
+      ADD={step:'approve',bank:b.name,bank_code:b.code,last4:a.slice(-4),mobile:mo,limit:l};render()}}
+  if(type==='exchange'){
+    if(ADD.step==='sign'){$('xno').onclick=()=>{ADD.step=null;render()};$('xok').onclick=async()=>{$('xok').disabled=true;$('xok').textContent='Signing…';await sleep(700);done({id:uid('pm_'),type:'exchange',provider:ADD.prov||'binance',label:ADD.label,per_txn_limit:ADD.per,monthly_limit:ADD.mon,created:Date.now()},`${EX[ADD.prov||'binance']} linked`)};return}
+    document.querySelectorAll('.xpick').forEach(b=>b.onclick=()=>{ADD.prov=b.dataset.p;ADD.label=$('xl').value;render()});
+    $('xsv').onclick=()=>{const t=Number($('xt').value),mo=Number($('xm').value);let ok=field('xt',t>=CFG.min_usdt?'':`At least ${CFG.min_usdt} USDT`);ok=field('xm',mo>=t?'':'Must be at least the per-transfer limit')&&ok;if(!ok)return;
+      Object.assign(ADD,{prov:ADD.prov||'binance',label:$('xl').value.trim()||EX[ADD.prov||'binance'],per:t,mon:mo,step:'sign'});render()}}};
+
+/* ================= SELL / SEND ================= */
+const COPY={sell:{title:'Sell USDT',sub:'To your own bank account',inL:'You sell',outL:'You receive',cu:[50,100,250,500],cl:[10000,25000,50000,100000]},
+            send:{title:'Send money',sub:'To any Sri Lankan bank account',inL:'You send',outL:'They receive',cu:[50,100,200,500],cl:[10000,25000,50000,100000]}};
+const payeesFor=tab=>DB.payees.filter(p=>tab==='sell'?p.is_self:!p.is_self);
+const activePayee=tab=>{const l=payeesFor(tab);return l.find(p=>p.id===draft.payee[tab])||l[0]||null};
+const activeEx=()=>{const l=eligible('sell');return l.find(m=>m.id===draft.account)||defaultFor('sell')};
+function composer(tab){draft.tab=tab;const C=COPY[tab];const p=activePayee(tab),a=activeEx();
+  return `${phead(C.title)}<div class="pad"><div class="col">
+  <div class="seg"><a href="#/sell" ${tab==='sell'?'aria-current="page"':''}>Sell</a><a href="#/send" ${tab==='send'?'aria-current="page"':''}>Send</a><a href="#/buy">Buy <span class="soon">Soon</span></a></div>
+  <div class="panel">
+    ${tab==='send'?`<div class="fine" style="margin-bottom:8px">Send to</div><div class="people">${payeesFor('send').map(x=>`<button class="pp ${p?.id===x.id?'on':''}" data-p="${x.id}"><span class="av">${esc(initials(x.nickname||x.account_name))}</span><span>${esc(x.nickname||x.account_name)}</span></button>`).join('')}<a class="pp add" href="#/payee/new?ret=send"><span class="av">＋</span><span>New</span></a></div>`:''}
+    <div class="box"><label for="amt"><span id="inLbl"></span></label><div class="amtline"><input id="amt" inputmode="decimal" placeholder="0" autocomplete="off" value="${esc(draft.amount)}"><button class="cur" id="inCur" aria-label="Switch currency"></button></div><div class="qchips" id="qchips"></div></div>
+    <div class="swap"><button id="swap" aria-label="Enter the other amount instead">⇅</button></div>
+    <div class="box"><label><span id="outLbl"></span></label><div class="amtline"><div class="out" id="out">—</div><span class="cur" id="outCur" style="margin-left:auto;cursor:default"></span></div></div>
+    ${p?`<a class="row" href="#/payee/new?${tab==='sell'?'self=1&':''}ret=${tab}&pick=1"><span class="k">To</span><span class="av">${esc(initials(p.account_name))}</span><div><b>${esc(p.is_self?'My account':(p.nickname||p.account_name))}</b><small>${esc(p.bank_name)} •••${mask4(p.account_number)}${p.is_self?'':' · '+esc(p.account_name)}</small></div><span class="chev">›</span></a>`
+       :`<a class="row need" href="#/payee/new?${tab==='sell'?'self=1&':''}ret=${tab}"><span class="k">To</span><span class="av">＋</span><div><b>${tab==='sell'?'Add your bank account':'Add a recipient'}</b><small>Any CEFT bank in Sri Lanka</small></div><span class="chev">›</span></a>`}
+    ${a?`<label class="row"><span class="k">From</span>${pmIcon(a)}<div style="flex:1;min-width:0"><b>${esc(mName(a))}</b><small>Up to ${a.per_txn_limit} USDT per transfer</small></div>${eligible('sell').length>1?`<select id="exsel" class="f" style="width:auto;height:32px;padding:0 26px 0 8px;font-size:13px" aria-label="Pay from">${eligible('sell').map(m=>`<option value="${m.id}" ${m.id===a.id?'selected':''}>${esc(mName(m))}</option>`).join('')}</select>`:''}</label>`
+       :`<a class="row need" href="#/wallet/add/exchange?ret=${tab}"><span class="k">From</span><span class="av">＋</span><div><b>Link Binance, Bybit or KuCoin</b><small>Cards and JustPay can’t be used to sell or send USDT</small></div><span class="chev">›</span></a>`}
+    <div class="rate" id="rate"></div>
+    <button class="btn lg" id="go" style="margin-top:14px" disabled>Enter an amount</button><div class="stepn" id="stepn"></div>
+  </div>
+  <div class="risk"><span class="ri">!</span><span><b>Digital assets are not legal tender in Sri Lanka.</b> Their value can change quickly, and they are not covered by deposit insurance. Only use funds that are lawfully yours. <a href="#/info/safety">How we keep this safe</a></span></div>
+  </div></div>`}
+function composerAfter(tab){const C=COPY[tab];const amt=()=>Number(String($('amt').value).replace(/,/g,''))||0;
+  const paintStatic=()=>{const u=draft.incur==='USDT';$('inLbl').textContent=u?C.inL:C.outL;$('outLbl').textContent=u?C.outL:C.inL;
+    $('inCur').innerHTML=u?'<i class="usdt">₮</i>USDT':'<i class="lkr">රු</i>LKR';$('outCur').innerHTML=u?'<i class="lkr">රු</i>LKR':'<i class="usdt">₮</i>USDT';
+    $('qchips').innerHTML=(u?C.cu:C.cl).map(v=>`<button class="qc ${String(v)===$('amt').value?'on':''}" data-v="${v}">${Number(v).toLocaleString()}</button>`).join('');
+    document.querySelectorAll('.qc').forEach(b=>b.onclick=()=>{$('amt').value=b.dataset.v;upd()})};
+  const upd=()=>{const a=amt();draft.amount=$('amt').value;draft.q=a?(draft.incur==='USDT'?quote(a):quote(0,a)):null;paintStatic();paintQ()};
+  const paintQ=()=>{const q=draft.q,a=amt(),p=activePayee(tab),acc=activeEx();
+    $('out').textContent=q?(draft.incur==='USDT'?fmt(q.lkr_out):fmt(q.gross_usdt)):'—';
+    $('rate').innerHTML=q?`<span>1 USDT = <span class="mono">LKR ${fmt(q.rate)}</span></span><span>Fees <span class="mono">${fmt(q.fees_usdt)} USDT</span></span><span>CeylonCash FX · ${fxDate()} ${fxBadge()}</span>`:`<span>Min ${CFG.min_usdt} USDT · ${CFG.daily_limit_usdt.toLocaleString()} USDT per day</span><span>Fees ~${CFG.fee_pct}%</span>`;
+    let label,href=null,dis=false,step='';
+    if(!a){label='Enter an amount';dis=true}else if(q.gross_usdt<CFG.min_usdt){label=`The minimum is ${CFG.min_usdt} USDT`;dis=true}
+    else if(DB.kyc!=='verified'){label='Verify your identity';href='#/verify?ret='+tab;step='Required by law, once, before your first transfer'}
+    else if(!acc){label='Link an exchange account';href='#/wallet/add/exchange?ret='+tab}
+    else if(!p){label=tab==='sell'?'Add your bank account':'Add a recipient';href=`#/payee/new?${tab==='sell'?'self=1&':''}ret=${tab}`}
+    else if(q.gross_usdt>acc.per_txn_limit){label=`Above the ${acc.per_txn_limit} USDT per-transfer limit`;dis=true;step='Lower the amount, pick another exchange account, or raise the limit in Wallet'}
+    else if(daySpent()+q.gross_usdt>CFG.daily_limit_usdt){label='Above today’s limit';dis=true}
+    else{label='Review';href='#/review/'+tab}
+    const b=$('go');b.textContent=label;b.disabled=dis;b.onclick=href?()=>go(href):null;$('stepn').textContent=step};
+  $('amt').addEventListener('input',()=>{$('amt').value=$('amt').value.replace(/[^\d.]/g,'');upd()});
+  $('amt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!$('go').disabled)$('go').click()});
+  $('swap').onclick=$('inCur').onclick=()=>{const q=draft.q;const o=q?(draft.incur==='USDT'?Math.round(q.lkr_out):q.gross_usdt):'';draft.incur=draft.incur==='USDT'?'LKR':'USDT';$('amt').value=o||'';upd();$('amt').focus()};
+  document.querySelectorAll('.pp[data-p]').forEach(b=>b.onclick=()=>{draft.payee.send=b.dataset.p;render()});
+  if($('exsel'))$('exsel').onchange=()=>{draft.account=$('exsel').value;render()};
+  every(()=>{if(Date.now()-FX.checked>5*60e3)loadFx()},30000);upd();if(matchMedia('(min-width:761px)').matches)$('amt').focus()}
+R.sell=()=>composer('sell');R.sell.after=()=>composerAfter('sell');R.send=()=>composer('send');R.send.after=()=>composerAfter('send');
+
+R.review=([tab])=>{tab=tab==='send'?'send':'sell';const q=draft.q,p=activePayee(tab),a=activeEx();if(!q||!p||!a||DB.kyc!=='verified'){setTimeout(()=>go('#/'+tab));return ''}const sell=tab==='sell';
+  return `${phead(sell?'Review sale':'Review transfer','','#/'+tab)}<div class="pad"><div class="col">
+  <div class="panel" style="text-align:center"><div class="fine">${sell?'You receive':'They receive'}</div><div class="amtbig">${lkr(q.lkr_out)}</div><div class="fine">for ${fmt(q.gross_usdt)} USDT</div></div>
+  <div class="panel"><div class="kv"><span>${sell?'You sell':'You send'}</span><b class="mono">${fmt(q.gross_usdt)} USDT</b></div><div class="kv"><span>Fees (exchange + CeyPay, ~${CFG.fee_pct}%)</span><b class="mono">− ${fmt(q.fees_usdt)} USDT</b></div><div class="kv"><span>Rate · CeylonCash FX</span><b class="mono">1 USDT = LKR ${fmt(q.rate)}</b></div><div class="kv"><span>Bank payout fee</span><b>Free</b></div><div class="kv"><span>Rate protection</span><b>Within ${CFG.tol_pct}%</b></div></div>
+  <div class="panel"><div class="kv"><span>From</span><b>${esc(mName(a))}</b></div><div class="kv"><span>To</span><b>${esc(p.account_name)}</b></div><div class="kv"><span>Bank</span><b>${esc(p.bank_name)} •••${mask4(p.account_number)}</b></div>
+   ${sell?'':`<div class="kv"><span>Relationship</span><b>${esc(p.relationship)}</b></div><div class="fld" style="margin-top:10px"><label for="pu">Purpose of transfer</label><select class="f" id="pu">${CFG.purposes.map(x=>`<option>${x}</option>`).join('')}</select></div>`}</div>
+  <label class="chk"><input type="checkbox" id="dc">${sell?'I confirm this USDT is mine and from a lawful source, and that the bank account is in my name.':'I confirm the funds are mine and from a lawful source, that I know the recipient, and that the purpose is correct.'}</label>
+  <button class="btn lg" id="cf" style="margin-top:14px" disabled>${sell?'Confirm sale':'Confirm and send'}</button>
+  <p class="fine" style="text-align:center;margin-top:10px">USDT is collected from ${esc(mName(a))} as soon as you confirm.</p><div id="rerr"></div>
+  <label class="chk fine" style="margin-top:20px;opacity:.8"><input type="checkbox" id="sim">Demo: simulate a rate drop during this transfer</label></div></div>`};
+R.review.after=([tab])=>{if(!$('dc'))return;tab=tab==='send'?'send':'sell';$('dc').onchange=()=>$('cf').disabled=!$('dc').checked;
+  $('cf').onclick=()=>{const q=draft.q,p=activePayee(tab),a=activeEx();
+    if(q.gross_usdt>a.per_txn_limit||spentBy(a.id,30)+q.gross_usdt>a.monthly_limit){$('rerr').innerHTML='<div class="err">This is above the limits on this exchange account.</div>';return}
+    const fresh=quote(q.gross_usdt);if(fresh.lkr_out<q.lkr_out*(1-CFG.tol_pct/100)){draft.q=fresh;$('rerr').innerHTML='<div class="err">The rate just moved. Please review the new amount.</div>';setTimeout(render,1200);return}
+    const t=newTx({kind:tab==='sell'?'sell':'remit',cp:tab==='sell'?{kind:'sell',name:'Sold USDT',key:'sell'}:{kind:'person',name:p.nickname||p.account_name,key:'p:'+p.id},method_id:a.id,state:'charging',usdt:q.gross_usdt,fees_usdt:q.fees_usdt,quoted_lkr:q.lkr_out,quote_rate:q.rate,purpose:tab==='sell'?'Savings':$('pu').value,
+      payee:{name:p.account_name,nickname:p.nickname,bank:p.bank_name,account:'•••'+mask4(p.account_number),self:p.is_self,relationship:p.relationship},_fail:p.account_number.endsWith('0000'),_drop:$('sim').checked});
+    draft.amount='';draft.q=null;go('#/activity/'+t.id)}};
+
+/* ================= BUY (soon) ================= */
+R.buy=()=>{const w=DB.waitlist;const jp=DB.methods.filter(m=>m.type==='justpay');
+  return `${phead('Buy USDT')}<div class="pad"><div class="col">
+  <div class="seg"><a href="#/sell">Sell</a><a href="#/send">Send</a><a href="#/buy" aria-current="page">Buy <span class="soon">Soon</span></a></div>
+  <div class="panel"><div class="box" style="opacity:.5"><label><span>You pay</span></label><div class="amtline"><input disabled placeholder="10,000" aria-label="Disabled"><span class="cur" style="cursor:default"><i class="lkr">රු</i>LKR</span></div></div>
+    <div class="swap" style="opacity:.5"><button disabled aria-hidden="true">↓</button></div>
+    <div class="box" style="opacity:.5"><label><span>You get</span></label><div class="amtline"><div class="out">—</div><span class="cur" style="margin-left:auto;cursor:default"><i class="usdt">₮</i>USDT</span></div></div>
+    <div style="margin-top:16px"><b style="color:var(--ink);font-weight:500;font-size:16px">Buying isn’t available yet</b><p class="fine" style="font-size:14px;margin:8px 0 0">We’ll open buying only after it is authorised under Sri Lanka’s virtual asset service provider framework and aligned with Central Bank rules on converting rupees.</p></div>
+    <div class="kv" style="margin-top:10px"><span>Pay with</span><b>Your own JustPay bank account only ${jp.length?'<span class="stat st-completed">Connected</span>':''}</b></div><div class="kv"><span>Not allowed</span><b>Cards, cash, third-party payments</b></div><div class="kv"><span>Receive in</span><b>Your own verified exchange account</b></div></div>
+  <div class="ptitle">Get notified</div><div class="panel">${w?`<div style="color:var(--ok)">✓ You’re on the list (${esc(w.email)}).</div><button class="btn ghost sm" id="wlx" style="margin-top:10px">Remove me</button>`:`<label class="chk" style="margin-top:0"><input type="checkbox" id="wc">Tell me at ${esc(DB.user.email||DB.user.phone)} when buying opens.</label><button class="btn lg" id="wgo" style="margin-top:14px" disabled>Notify me</button>`}</div></div></div>`};
+R.buy.after=()=>{if($('wc')){$('wc').onchange=()=>$('wgo').disabled=!$('wc').checked;$('wgo').onclick=()=>{DB.waitlist={email:DB.user.email||DB.user.phone,at:Date.now()};save();toast('You’re on the list');render()}}if($('wlx'))$('wlx').onclick=()=>{DB.waitlist=null;save();render()}};
+
+/* ================= payee, verify, account, rates, info ================= */
+R.payee=(_,q)=>{const self=q.get('self')==='1';const ret=q.get('ret');const back=ret?'#/'+ret:'#/account';const l=DB.payees.filter(p=>p.is_self===self);
+  const pick=q.get('pick')&&l.length?`<div class="panel" style="padding:6px">${l.map(p=>`<button class="lrow w3" data-p="${p.id}">${cpLogo({kind:'person',name:p.account_name})}<div style="min-width:0"><div class="nm">${esc(self?p.bank_name:(p.nickname||p.account_name))}</div><div class="fine">${esc(self?'•••'+mask4(p.account_number):p.bank_name+' •••'+mask4(p.account_number))}</div></div><span class="fine">${activePayee(self?'sell':'send')?.id===p.id?'Selected':''}</span></button>`).join('')}</div><div class="ptitle">Or add new</div>`:'';
+  return `${phead(pick?(self?'Pay out to':'Send to'):self?'Add your bank account':'Add a recipient','',back)}<div class="pad"><div class="col">${pick}<div class="panel">
+  <div class="fld" style="margin-top:0"><label for="pb">Bank</label><select class="f" id="pb"><option value="">Choose bank</option>${BANKS.map(b=>`<option value="${b.code}">${esc(b.name)}</option>`).join('')}</select><div class="ferr"></div></div>
+  <div class="fld"><label for="pa">Account number</label><input class="f cd" id="pa" inputmode="numeric" autocomplete="off"><div class="ferr"></div></div>
+  <div class="fld"><label for="pn">Account holder name</label><input class="f" id="pn" value="${self?esc(DB.user.name):''}" ${self?'readonly':''}><div class="ferr"></div>${self?'<div class="fine" style="margin-top:5px">Must match your verified identity.</div>':''}</div>
+  ${self?'':`<div class="two"><div class="fld"><label for="pr">Relationship</label><select class="f" id="pr">${CFG.relationships.map(x=>`<option>${x}</option>`).join('')}</select></div><div class="fld"><label for="pk">Nickname</label><input class="f" id="pk" placeholder="e.g. Amma"></div></div>
+  <div class="fld"><label for="pm">Their mobile (optional, for an SMS alert)</label><input class="f cd" id="pm" inputmode="tel" placeholder="07X XXX XXXX"><div class="ferr"></div></div>`}
+  <button class="btn lg" id="ps" style="margin-top:16px">Save</button></div></div></div>`};
+R.payee.after=(_,q)=>{const self=q.get('self')==='1';const ret=q.get('ret');const tab=self?'sell':'send';
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{draft.payee[tab]=b.dataset.p;go(ret?'#/'+ret:'#/'+tab)});
+  $('ps').onclick=()=>{const bank=BANKS.find(b=>b.code==$('pb').value),acct=$('pa').value.replace(/\s/g,''),name=$('pn').value.trim(),mob=($('pm')?.value||'').replace(/[^\d+]/g,'');
+    let ok=field('pb',bank?'':'Choose a bank');ok=field('pa',/^\d{6,20}$/.test(acct)?(DB.payees.some(p=>p.bank_code===bank?.code&&p.account_number===acct&&p.is_self===self)?'You’ve already saved this account':''):'Account number should be 6 to 20 digits')&&ok;
+    ok=field('pn',name.length>=3?'':'Enter the account holder’s name')&&ok;if($('pm'))ok=field('pm',!mob||/^(\+94|0)7\d{8}$/.test(mob)?'':'Mobile should look like 07X XXX XXXX')&&ok;if(!ok)return;
+    const p={id:uid('pay_'),is_self:self,bank_code:bank.code,bank_name:bank.name,account_number:acct,account_name:name,nickname:($('pk')?.value||'').trim()||name.split(' ')[0],relationship:self?'Self':$('pr').value,mobile:mob||null};
+    DB.payees.unshift(p);save();draft.payee[tab]=p.id;toast('Saved');go(ret?'#/'+decodeURIComponent(ret):'#/account')}};
+R.verify=(_,q)=>{const ret=q.get('ret')?'#/'+decodeURIComponent(q.get('ret')):'#/home';
+  if(DB.kyc==='verified')return `${phead('Identity verified','',ret)}<div class="pad"><div class="col"><div class="panel empty"><div class="tick">✓</div><b>You’re verified</b>You won’t need to do this again.<br><a class="btn" href="${ret}" style="margin-top:12px">Continue</a></div></div></div>`;
+  return `${phead('Verify your identity','',ret)}<div class="pad"><div class="col"><p style="color:var(--muted);margin:0 0 14px">Required by law before you sell or send. About 2 minutes, once.</p>
+  <div class="panel"><div class="kv"><span>1 · Document</span><b>NIC or passport</b></div><div class="kv"><span>2 · Selfie</span><b>Liveness check</b></div><div class="kv"><span>3 · Screening</span><b>Sanctions, PEP, adverse media</b></div></div>
+  <p class="fine" style="margin:12px 2px">In production this opens the Didit verification flow. Your data is used only to meet legal obligations.</p>
+  <label class="chk"><input type="checkbox" id="kc">I confirm the details I provide are true, and I consent to identity verification and screening.</label>
+  <button class="btn lg" id="kgo" style="margin-top:14px" disabled>Start verification</button><div id="kst"></div></div></div>`};
+R.verify.after=(_,q)=>{if(!$('kc'))return;$('kc').onchange=()=>$('kgo').disabled=!$('kc').checked;$('kgo').onclick=async()=>{$('kgo').disabled=true;$('kgo').textContent='Verifying…';$('kst').innerHTML='<div class="prog"><div class="pst"><span class="dt run"></span>Checking your document and selfie</div></div>';await sleep(1300);DB.kyc='verified';save();toast('Identity verified');go(q.get('ret')?'#/'+decodeURIComponent(q.get('ret')):'#/home')}};
+R.account=()=>{const u=DB.user;const prov=[['google','Google'],['apple','Apple'],['binance','Binance'],['phone','Mobile number'],['email','Email']];
+  return `${phead('Account')}<div class="pad"><div class="col">
+  <div class="panel" style="display:flex;gap:14px;align-items:center"><span class="avt" style="width:52px;height:52px;font-size:18px">${esc(initials(u.name))}</span><div><b style="color:var(--ink);font-weight:500;font-size:17px">${esc(u.name)}</b><div class="fine">${esc(u.email||'')}${u.phone?' · '+esc(u.phone):''}</div></div></div>
+  <div class="ptitle">Sign-in methods</div><div class="panel" style="padding:4px 18px">${prov.map(([k,l])=>{const on=(u.providers||[]).includes(k)||(k==='email'&&u.email&&u.via==='email')||(k==='phone'&&u.phone);return `<div class="kv"><span>${l}</span><b>${on?'<span class="stat st-completed">Connected</span>':`<button class="btn ghost sm" data-conn="${k}">Connect</button>`}</b></div>`}).join('')}</div>
+  <div class="ptitle">Verification &amp; limits</div><div class="panel" style="padding:4px 18px"><div class="kv"><span>Identity</span><b>${DB.kyc==='verified'?'<span class="stat st-completed">Verified</span>':'<a class="btn sm" href="#/verify?ret=account">Verify now</a>'}</b></div><div class="kv"><span>Daily limit</span><b>${fmt(daySpent())} / ${CFG.daily_limit_usdt.toLocaleString()} USDT</b></div><div class="kv"><span>Bank accounts &amp; recipients</span><b>${DB.payees.length}</b></div></div>
+  <div class="ptitle">Bank accounts &amp; recipients<a href="#/payee/new">＋ Add</a></div><div class="panel" style="padding:6px">${DB.payees.map(p=>`<div class="lrow w3" style="cursor:default">${cpLogo({kind:'person',name:p.account_name})}<div style="min-width:0"><div class="nm">${esc(p.is_self?'My '+bankShort(p.bank_name):(p.nickname||p.account_name))}</div><div class="fine">${esc(p.bank_name)} •••${mask4(p.account_number)} · ${esc(p.relationship)}</div></div><button class="btn ghost sm" data-del="${p.id}" style="color:var(--err)">Remove</button></div>`).join('')||'<div class="empty" style="padding:22px">None yet</div>'}</div>
+  <div class="ptitle">Help</div><div class="panel" style="padding:4px 18px"><a class="kv" href="#/rates"><span>Exchange rates</span><b>›</b></a><a class="kv" href="#/info/safety"><span>Safety &amp; compliance</span><b>›</b></a><a class="kv" href="#/info/fees"><span>Fees &amp; limits</span><b>›</b></a><a class="kv" href="#/info/faq"><span>Help &amp; complaints</span><b>›</b></a></div>
+  <div class="two" style="margin-top:16px"><button class="btn ghost lg" id="so">${IC.logout.replace('<svg','<svg style="width:18px;height:18px"')}Sign out</button><button class="btn ghost lg" id="rs" style="color:var(--err)">Reset demo</button></div>${legal()}</div></div>`};
+R.account.after=()=>{document.querySelectorAll('[data-conn]').forEach(b=>b.onclick=()=>{DB.user.providers=[...(DB.user.providers||[]),b.dataset.conn];save();toast('Connected');render()});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(!armed(b,'Confirm'))return;DB.payees=DB.payees.filter(p=>p.id!==b.dataset.del);save();render()});
+  $('so').onclick=()=>{DB.user=null;save();AUTH={step:'start'};go('#/home')};$('rs').onclick=()=>{if(!armed($('rs'),'Tap again'))return;Object.keys(localStorage).filter(k=>k.startsWith('cpw_')).forEach(k=>localStorage.removeItem(k));location.hash='#/home';location.reload()}};
+R.rates=()=>{const cur=Object.keys(FX.data).filter(k=>k!=='_meta'&&FX.data[k].buying_rate!==undefined);const f=(v,c)=>v?fmt(v,c==='JPY'||c==='INR'?4:2):'—';
+  const body=`<div class="panel" style="padding:6px 16px;overflow-x:auto"><table class="fees"><tr><th>Currency</th><th>TT buying</th><th>Selling</th></tr>${cur.map(c=>`<tr><td><b style="font-family:'Geist Mono',monospace;color:var(--ink);font-weight:500">${c}</b><div class="fine">${esc(titleCase(FX.data[c].description))}</div></td><td class="mono">${f(FX.data[c].telegraphic_transfers_buying_rate||FX.data[c].buying_rate,c)}</td><td class="mono">${f(FX.data[c].selling_rate,c)}</td></tr>`).join('')}</table></div>
+   <p class="fine" style="margin-top:12px">LKR per 1 unit. CeyPay uses <b style="color:var(--text)">USD TT buying</b> as its USDT reference, before fees. Source: <a href="${FX_BASE}" target="_blank" rel="noopener" style="color:var(--blue)">fx.ceyloncash.com</a> · as of ${fxDate()} ${fxBadge()}</p>`;
+  return DB.user?`${phead('Exchange rates','','#/home')}<div class="pad"><div class="col">${body}</div></div>`:`<div class="auth" style="place-items:start center"><div class="authc" style="max-width:640px"><a href="#/signin" class="btn ghost sm" style="margin-bottom:14px">← Sign in</a><h1 style="color:var(--ink);font-weight:500;margin:0 0 12px">Exchange rates</h1>${body}</div></div>`};
+R.info=([page])=>{const back=DB.user?'#/account':'#/signin';let b='';
+  if(page==='fees')b=`<div class="panel" style="padding:6px 16px"><table class="fees"><tr><th>Item</th><th>Fee / limit</th></tr><tr><td>Sell &amp; send (exchange + CeyPay)</td><td>~${CFG.fee_pct}% of USDT</td></tr><tr><td>Bills &amp; reloads (card or JustPay)</td><td>Free</td></tr><tr><td>Bank payout (CEFT)</td><td>Free</td></tr><tr><td>Minimum transfer</td><td>${CFG.min_usdt} USDT</td></tr><tr><td>Daily limit</td><td>${CFG.daily_limit_usdt.toLocaleString()} USDT</td></tr><tr><td>Reference rate</td><td>CeylonCash FX · USD TT buying</td></tr><tr><td>Rate protection</td><td>Asks you if it moves more than ${CFG.tol_pct}%</td></tr></table></div>`;
+  else if(page==='faq')b=`<div class="panel faq" style="padding:4px 18px"><details><summary>Which payment methods can I use?</summary><p>Exchange accounts (Binance, Bybit, KuCoin) for selling, sending and paying in USDT. Cards and JustPay bank accounts for bills and reloads in rupees. Cards can’t be used for digital assets.</p></details><details><summary>What is JustPay?</summary><p>LankaClear’s account-to-account service. You approve CeyPay once in your bank app, then confirm each payment within your limit.</p></details><details><summary>How do recurring payments work?</summary><p>Set a bill autopay, a mobile reload, or a monthly transfer. You can change the payment method, pause or cancel at any time. For transfers, you confirm the rate each time.</p></details><details><summary>How do I make a complaint?</summary><p>Email ${esc(CFG.support)} with your CeyPay reference. We acknowledge within 1 working day and aim to resolve within 7.</p></details></div>`;
+  else b=`<div class="panel"><div class="kv"><span>Identity</span><b>NIC/passport + liveness, once</b></div><div class="kv"><span>Screening</span><b>Sanctions, PEP, adverse media</b></div><div class="kv"><span>Limits</span><b>Per transfer, daily, monthly</b></div><div class="kv"><span>Records</span><b>Sender, recipient, purpose, rate, bank ref</b></div><div class="kv"><span>Money flow</span><b>Exchange → CEFT bank account only</b></div><div class="kv"><span>Cards</span><b>Tokenised by Pay&amp;Go, never stored</b></div></div>`;
+  const t={fees:'Fees and limits',faq:'Help and complaints'}[page]||'How we keep this safe';
+  return DB.user?`${phead(t,'',back)}<div class="pad"><div class="col">${b}${legal()}</div></div>`:`<div class="auth" style="place-items:start center"><div class="authc" style="max-width:640px"><a href="#/signin" class="btn ghost sm" style="margin-bottom:14px">← Sign in</a><h1 style="color:var(--ink);font-weight:500;margin:0 0 12px">${t}</h1>${b}${legal()}</div></div>`};
+
+document.addEventListener('input',e=>{const f=e.target.closest?.('.fld');if(f&&f.classList.contains('bad')){f.classList.remove('bad');const x=f.querySelector('.ferr');if(x)x.textContent=''}});
+render();loadFx();
+</script>
+</body>
+</html>

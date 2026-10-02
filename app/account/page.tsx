@@ -1,258 +1,165 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQueryStates } from "nuqs";
-import {
-  Avatar,
-  Button,
-  ButtonLink,
-  ConfirmButton,
-  Empty,
-  Kv,
-  Legal,
-  ListPanel,
-  NavKv,
-  Panel,
-  SectionTitle,
-  Stat,
-  TitleLink,
-  TwoCol,
-  Vh,
-  Xl,
-  col,
-  listRow,
-  listRowEnd,
-} from "@/components/ui";
-import { AddPayee, LinkExchange, SignIn, Verify } from "@/components/account/flows";
-import { CFG, PNAME } from "@/lib/config";
+import { Button, ButtonLink, ConfirmButton, CpLogo, Empty, Kv, LRow, Legal, ListPanel, NavKv, PageHead, Pad, Panel, SectionTitle, Stat, TitleLink, TwoCol, col } from "@/components/ui";
+import { AddPayee, Verify } from "@/components/account/flows";
+import { CFG, bankShort } from "@/lib/config";
 import { fmt, initials, mask } from "@/lib/format";
-import { daySpent, monthSpent } from "@/lib/backend";
-import { activeAccount, commit, resetAll, useApp } from "@/lib/store";
+import { daySpent, type SignInVia } from "@/lib/backend";
+import { commit, resetAll, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { accountParams, accountUrl, infoUrl } from "@/lib/params";
 
-const HelpLinks = ({ safetyLabel = "Safety" }: { safetyLabel?: string }) => (
-  <>
-    <NavKv href={infoUrl("safety")} label={safetyLabel} />
-    <NavKv href={infoUrl("fees")} label="Fees & limits" />
-    <NavKv href={infoUrl("faq")} label="Help & complaints" />
-  </>
-);
-
-/** Thin usage bar. */
-const Bar = ({ pct }: { pct: number }) => (
-  <div className="mt-2 h-[5px] overflow-hidden rounded-[5px] bg-line-subtle">
-    <i className="block h-full bg-brand" style={{ width: `${Math.min(100, pct)}%` }} />
-  </div>
-);
-
-function PayeeList({ self }: { self: boolean }) {
-  const { db } = useApp();
-  const l = db.payees.filter((p) => p.is_self === self);
-  if (!l.length) return <Empty className="py-[22px]">{self ? "No bank account yet" : "No recipients yet"}</Empty>;
-  return l.map((p) => (
-    <div className={listRow} key={p.id}>
-      <Avatar>{initials(self ? p.bank_name : p.account_name)}</Avatar>
-      <div>
-        <b>{self ? p.bank_name : p.nickname || p.account_name}</b>
-        <small>{self ? mask(p.account_number) : `${p.bank_name} ${mask(p.account_number)} · ${p.relationship}`}</small>
-      </div>
-      <div className={listRowEnd}>
-        <ConfirmButton
-          variant="danger"
-          size="sm"
-          label="Remove"
-          armedLabel="Confirm remove"
-          onConfirm={() => {
-            commit((db) => void (db.payees = db.payees.filter((x) => x.id !== p.id)));
-            toast("Removed");
-          }}
-        />
-      </div>
-    </div>
-  ));
-}
+const PROVIDERS: [SignInVia, string][] = [
+  ["google", "Google"],
+  ["apple", "Apple"],
+  ["binance", "Binance"],
+  ["phone", "Mobile number"],
+  ["email", "Email"],
+];
 
 function Overview() {
   const router = useRouter();
-  const { db, draft } = useApp();
-
-  if (!db.user)
-    return (
-      <div className={col}>
-        <Vh title="Account" to={false} />
-        <Panel>
-          <Empty title="You’re not signed in">
-            Sign in to sell, send and manage your accounts.
-            <br />
-            <ButtonLink className="mt-3" href={accountUrl({ flow: "signin" })}>
-              Sign in
-            </ButtonLink>
-          </Empty>
-        </Panel>
-        <Panel>
-          <HelpLinks />
-        </Panel>
-        <Legal />
-      </div>
-    );
-
-  const used = daySpent(db);
-  const def = activeAccount(db, draft);
+  const { db } = useApp();
+  const u = db.user!;
 
   return (
-    <div className={col}>
-      <Vh title={db.user.name} sub={db.user.email} to={false} />
-      <Panel>
-        <Kv label="Identity">
-          {db.kyc === "verified" ? (
-            <Stat>Verified</Stat>
-          ) : (
-            <ButtonLink size="sm" href={accountUrl({ flow: "verify" })}>
-              Verify now
-            </ButtonLink>
-          )}
-        </Kv>
-        <div className="mt-2.5">
-          <div className="flex justify-between text-[13px] text-muted">
-            <span>Daily limit</span>
-            <b className="font-medium text-ink">
-              {fmt(used)} / {CFG.daily_limit_usdt.toLocaleString()} USDT
-            </b>
-          </div>
-          <Bar pct={(used / CFG.daily_limit_usdt) * 100} />
-        </div>
-      </Panel>
+    <>
+      <PageHead title="Account" />
+      <Pad>
+        <div className={col}>
+          <Panel className="flex items-center gap-3.5">
+            <span className="grid size-[52px] flex-none place-items-center rounded-full bg-brand text-lg font-semibold text-white">{initials(u.name)}</span>
+            <div>
+              <b className="text-[17px] font-medium text-ink">{u.name}</b>
+              <div className="text-[12.5px] text-muted">
+                {u.email}
+                {u.phone && ` · ${u.phone}`}
+              </div>
+            </div>
+          </Panel>
 
-      <SectionTitle
-        action={
-          <TitleLink href={accountUrl({ flow: "link" })}>
-            <Plus size={14} /> Link
-          </TitleLink>
-        }
-      >
-        Exchange accounts
-      </SectionTitle>
-      <ListPanel>
-        {db.accounts.length ? (
-          db.accounts.map((a) => {
-            const m = monthSpent(db, a);
-            return (
-              <div className={listRow} key={a.id}>
-                <Xl p={a.provider} />
-                <div className="flex-1">
-                  <b className="flex! items-center gap-1.5">
-                    {a.label} {def?.id === a.id && <Stat>Default</Stat>}
-                  </b>
-                  <small>
-                    {PNAME[a.provider]} · ≤ {a.per_txn_limit} USDT per transfer
-                  </small>
-                  <Bar pct={(m / a.monthly_limit) * 100} />
-                  <small>
-                    {fmt(m, 0)} / {a.monthly_limit} USDT this month
-                  </small>
-                </div>
-                <div className={listRowEnd}>
-                  {def?.id !== a.id && (
+          <SectionTitle>Sign-in methods</SectionTitle>
+          <Panel className="py-1">
+            {PROVIDERS.map(([k, l]) => {
+              const on = u.providers.includes(k) || (k === "email" && !!u.email && u.via === "email") || (k === "phone" && !!u.phone);
+              return (
+                <Kv key={k} label={l}>
+                  {on ? (
+                    <Stat>Connected</Stat>
+                  ) : (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        commit((_, d) => void (d.account = a.id));
-                        toast("Default updated");
+                        commit(() => void u.providers.push(k));
+                        toast("Connected");
                       }}
                     >
-                      Make default
+                      Connect
                     </Button>
                   )}
-                  <ConfirmButton
-                    variant="danger"
-                    size="sm"
-                    label="Remove"
-                    armedLabel="Confirm remove"
-                    onConfirm={() => {
-                      commit((db) => void (db.accounts = db.accounts.filter((x) => x.id !== a.id)));
-                      toast("Exchange account removed");
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <Empty title="No exchange linked">
-            <ButtonLink className="mt-2.5" href={accountUrl({ flow: "link" })}>
-              Link Binance, Bybit or KuCoin
-            </ButtonLink>
-          </Empty>
-        )}
-      </ListPanel>
+                </Kv>
+              );
+            })}
+          </Panel>
 
-      <SectionTitle
-        action={
-          <TitleLink href={accountUrl({ flow: "payee", self: true })}>
-            <Plus size={14} /> Add
-          </TitleLink>
-        }
-      >
-        My bank accounts
-      </SectionTitle>
-      <ListPanel>
-        <PayeeList self />
-      </ListPanel>
-      <SectionTitle
-        action={
-          <TitleLink href={accountUrl({ flow: "payee" })}>
-            <Plus size={14} /> Add
-          </TitleLink>
-        }
-      >
-        Recipients
-      </SectionTitle>
-      <ListPanel>
-        <PayeeList self={false} />
-      </ListPanel>
-      <SectionTitle>Help</SectionTitle>
-      <ListPanel className="py-1">
-        <HelpLinks safetyLabel="Safety & compliance" />
-      </ListPanel>
-      <TwoCol className="mt-4">
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={() => {
-            commit((db) => void (db.user = null));
-            toast("Signed out");
-            router.push("/");
-          }}
-        >
-          Sign out
-        </Button>
-        <ConfirmButton
-          variant="danger"
-          size="lg"
-          label="Reset demo"
-          armedLabel="Tap again to reset"
-          onConfirm={() => {
-            resetAll();
-            router.push("/");
-          }}
-        />
-      </TwoCol>
-      <Legal />
-    </div>
+          <SectionTitle>Verification &amp; limits</SectionTitle>
+          <Panel className="py-1">
+            <Kv label="Identity">
+              {db.kyc === "verified" ? (
+                <Stat>Verified</Stat>
+              ) : (
+                <ButtonLink size="sm" href={accountUrl({ flow: "verify", ret: "/account" })}>
+                  Verify now
+                </ButtonLink>
+              )}
+            </Kv>
+            <Kv label="Daily limit">
+              {fmt(daySpent(db))} / {CFG.daily_limit_usdt.toLocaleString()} USDT
+            </Kv>
+            <Kv label="Bank accounts &amp; recipients">{db.payees.length}</Kv>
+          </Panel>
+
+          <SectionTitle
+            action={
+              <TitleLink href={accountUrl({ flow: "payee" })}>
+                <Plus size={14} /> Add
+              </TitleLink>
+            }
+          >
+            Bank accounts &amp; recipients
+          </SectionTitle>
+          <ListPanel>
+            {db.payees.length ? (
+              db.payees.map((p) => (
+                <LRow
+                  key={p.id}
+                  variant="w3"
+                  as="div"
+                  logo={<CpLogo cp={{ kind: "person", name: p.account_name }} />}
+                  title={p.is_self ? "My " + bankShort(p.bank_name) : p.nickname || p.account_name}
+                  sub={`${p.bank_name} ${mask(p.account_number)} · ${p.relationship}`}
+                  end={
+                    <ConfirmButton
+                      variant="danger"
+                      size="sm"
+                      className="font-sans"
+                      label="Remove"
+                      armedLabel="Confirm"
+                      onConfirm={() => commit((db) => void (db.payees = db.payees.filter((x) => x.id !== p.id)))}
+                    />
+                  }
+                />
+              ))
+            ) : (
+              <Empty className="py-[22px]">None yet</Empty>
+            )}
+          </ListPanel>
+
+          <SectionTitle>Help</SectionTitle>
+          <Panel className="py-1">
+            <NavKv href="/rates" label="Exchange rates" />
+            <NavKv href={infoUrl("safety")} label="Safety & compliance" />
+            <NavKv href={infoUrl("fees")} label="Fees & limits" />
+            <NavKv href={infoUrl("faq")} label="Help & complaints" />
+          </Panel>
+
+          <TwoCol className="mt-4">
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={() => {
+                commit((db) => void (db.user = null));
+                router.push("/signin");
+              }}
+            >
+              <LogOut /> Sign out
+            </Button>
+            <ConfirmButton
+              variant="danger"
+              size="lg"
+              label="Reset demo"
+              armedLabel="Tap again"
+              onConfirm={() => {
+                resetAll();
+                router.push("/signin");
+              }}
+            />
+          </TwoCol>
+          <Legal />
+        </div>
+      </Pad>
+    </>
   );
 }
 
-/** Account overview, or a setup flow via `?flow=signin|verify|link|payee&ret=…`. */
+/** Account overview, or a setup flow via `?flow=verify|payee&ret=…`. */
 export default function AccountPage() {
   const [{ flow, ret, self }] = useQueryStates(accountParams);
-  const { db } = useApp();
-  if (flow && !db.user) return <SignIn ret={ret} />;
-  if (flow === "signin") return <SignIn ret={ret} />;
   if (flow === "verify") return <Verify ret={ret} />;
-  if (flow === "link") return <LinkExchange ret={ret} />;
   if (flow === "payee") return <AddPayee ret={ret} self={self} />;
   return <Overview />;
 }

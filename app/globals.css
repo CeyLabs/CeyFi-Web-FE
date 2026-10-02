@@ -93,9 +93,11 @@
 
   --radius-card: 24px;
 
-  /* Match the original layout: phone ≤520px, tablet/nav switch ≤820px. */
+  /* Match the design: phone ≤520px, bottom nav ≤760px, icon rail ≤940px, narrow detail pane ≤1180px. */
   --breakpoint-sm: 521px;
-  --breakpoint-md: 821px;
+  --breakpoint-md: 761px;
+  --breakpoint-lg: 941px;
+  --breakpoint-xl: 1181px;
 
   --animate-view-in: view-in 0.18s ease-out;
   --animate-shimmer: shimmer 1.2s infinite;

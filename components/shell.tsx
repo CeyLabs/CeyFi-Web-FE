@@ -3,106 +3,175 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { I, Logo } from "./icons";
-import { Soon, button } from "./ui";
+import { Soon } from "./ui";
 import { cn } from "cn";
 import { useApp } from "@/lib/store";
 import { initials } from "@/lib/format";
+import { loadFx } from "@/lib/fx";
+import { isExpired } from "@/lib/backend";
 import { onToast } from "@/lib/toast";
-import { accountUrl, tradeParams, tradeUrl } from "@/lib/params";
+import { safeRet, signInUrl, tradeParams, tradeUrl } from "@/lib/params";
+
+/** Routes that work signed out. */
+const PUBLIC = ["signin", "info", "rates"];
 
 /** Which nav item is active: trade screens map to their tab, sub-routes to their parent. */
 function useTop() {
   const seg = usePathname().split("/")[1];
   const [tab] = useQueryState("tab", tradeParams.tab);
   if (seg === "trade") return tab;
-  if (seg === "transfer") return "activity";
-  if (!seg || seg === "info") return "home";
+  if (!seg || seg === "rates") return "home";
+  if (seg === "info") return "account";
   return seg;
 }
 
-const cur = (top: string, r: string) => (top === r ? ({ "aria-current": "page" } as const) : {});
+const cur = (on: boolean) => (on ? ({ "aria-current": "page" } as const) : {});
 
-const topLink =
-  "flex items-center gap-1.5 rounded-[9px] px-3 py-2 text-sm text-muted hover:bg-glass hover:text-ink aria-[current=page]:bg-glass aria-[current=page]:text-ink aria-[current=page]:shadow-[inset_0_0_0_1px_var(--line)]";
-const bottomLink =
-  "flex flex-col items-center gap-[3px] py-1 text-[11px] text-muted aria-[current=page]:text-brand [&_svg]:size-[22px]";
+const sideLink =
+  "relative flex items-center gap-3 rounded-[11px] px-3 py-2.5 text-[15px] text-fg hover:bg-glass-subtle hover:text-ink max-lg:justify-center max-lg:p-3 [&>svg]:size-5 [&>svg]:flex-none aria-[current=page]:bg-glass aria-[current=page]:text-ink aria-[current=page]:shadow-[inset_0_0_0_1px_var(--line)]";
+const label = "max-lg:hidden";
 
-function TopNav() {
+function Sidebar() {
   const top = useTop();
-  return (
-    <nav className="ml-2.5 hidden gap-1 md:flex" aria-label="Main">
-      <Link className={topLink} href="/" {...cur(top, "home")}>Home</Link>
-      <Link className={topLink} href={tradeUrl({ tab: "sell" })} {...cur(top, "sell")}>Sell</Link>
-      <Link className={topLink} href={tradeUrl({ tab: "send" })} {...cur(top, "send")}>Send</Link>
-      <Link className={topLink} href={tradeUrl({ tab: "buy" })} {...cur(top, "buy")}>
-        Buy <Soon />
-      </Link>
-      <Link className={topLink} href="/activity" {...cur(top, "activity")}>Activity</Link>
-    </nav>
+  const { db } = useApp();
+  const u = db.user!;
+  const alert = db.methods.some(isExpired);
+  const nav = (href: string, key: string, text: ReactNode, icon: ReactNode, extra?: ReactNode) => (
+    <Link className={sideLink} href={href} {...cur(top === key)}>
+      {icon}
+      <span className={cn(label, "flex items-center gap-1.5")}>{text}</span>
+      {extra}
+    </Link>
   );
-}
-
-export function Header() {
-  const router = useRouter();
-  const { ready, db } = useApp();
   return (
-    <header className="sticky top-0 z-40 border-b border-line-subtle bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-[60px] max-w-[1080px] items-center gap-[18px] px-5">
-        <Link href="/" className="text-ink [&_svg]:block [&_svg]:h-6 [&_svg]:w-auto" aria-label="CeyPay home">
+    <aside className="sticky top-0 flex h-screen flex-col border-r border-line-subtle bg-elevated px-2.5 pt-5 pb-3.5 max-md:hidden lg:px-3.5 lg:pt-[22px]">
+      <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-[22px] max-lg:hidden" aria-label="CeyPay home">
+        <span className="text-ink [&_svg]:block [&_svg]:h-[26px] [&_svg]:w-auto">
           <Logo />
-        </Link>
-        <span className="rounded-full bg-warn-soft px-2 py-[3px] font-mono text-[10.5px] tracking-[.5px] text-warn">DEMO</span>
-        <Suspense>
-          <TopNav />
-        </Suspense>
-        <div className="flex-1" />
-        <div>
-          {ready &&
-            (db.user ? (
-              <button className="grid size-[34px] place-items-center rounded-full bg-brand text-[13px] font-semibold text-white" onClick={() => router.push("/account")} title="Account" aria-label="Account">
-                {initials(db.user.name)}
-              </button>
-            ) : (
-              <Link className={button()} href={accountUrl({ flow: "signin" })}>
-                Sign in
-              </Link>
-            ))}
+        </span>
+        <span className="rounded-full bg-warn-soft px-[7px] py-[3px] font-mono text-[10px] tracking-[.5px] text-warn">DEMO</span>
+      </Link>
+      {nav("/", "home", "Home", I.home)}
+      {nav("/activity", "activity", "Activity", I.activity)}
+      {nav("/recurring", "recurring", "Recurring", I.recurring)}
+      {nav("/wallet", "wallet", "Wallet", I.wallet, alert && <span className="absolute right-3 size-[7px] rounded-full bg-err" title="Needs attention" />)}
+      <div className="px-3 pt-[18px] pb-1.5 font-mono text-[11px] tracking-[.8px] text-muted uppercase max-lg:hidden">Move money</div>
+      {nav(tradeUrl({ tab: "sell" }), "sell", "Sell USDT", I.sell)}
+      {nav(tradeUrl({ tab: "send" }), "send", "Send money", I.send)}
+      {nav(
+        tradeUrl({ tab: "buy" }),
+        "buy",
+        <>
+          Buy USDT <Soon />
+        </>,
+        I.buy,
+      )}
+      <div className="flex-1" />
+      <Link
+        href="/account"
+        className="mt-2.5 flex w-full items-center gap-3 border-t border-line-subtle px-2.5 pt-3.5 pb-1 text-left max-lg:justify-center max-lg:px-0 max-lg:pt-3"
+        {...cur(top === "account")}
+      >
+        <span className="grid size-10 flex-none place-items-center rounded-full bg-brand font-semibold text-white">{initials(u.name)}</span>
+        <div className="min-w-0 max-lg:hidden">
+          <b className="block text-[14.5px] font-medium text-ink">Hello {u.name.split(" ")[0]}</b>
+          <small className="block max-w-[160px] truncate text-[12.5px] text-muted">{u.email || u.phone}</small>
         </div>
-      </div>
-    </header>
+      </Link>
+    </aside>
   );
 }
 
-export function BottomNav() {
+const bottomLink = "flex flex-col items-center gap-[3px] py-1 text-[11px] text-muted aria-[current=page]:text-brand [&_svg]:size-[22px]";
+
+function BottomNav() {
   const top = useTop();
+  const move = ["sell", "send", "buy"].includes(top);
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line-subtle bg-canvas/90 px-1 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line-subtle bg-canvas/95 px-1 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom))] backdrop-blur-md md:hidden"
       aria-label="Main"
     >
-      <Link className={bottomLink} href="/" {...cur(top, "home")}>{I.home}Home</Link>
-      <Link className={bottomLink} href={tradeUrl({ tab: "sell" })} {...cur(top, "sell")}>{I.sell}Sell</Link>
-      <Link className={bottomLink} href={tradeUrl({ tab: "send" })} {...cur(top, "send")}>{I.send}Send</Link>
-      <Link className={bottomLink} href="/activity" {...cur(top, "activity")}>{I.activity}Activity</Link>
-      <Link className={bottomLink} href="/account" {...cur(top, "account")}>{I.account}Account</Link>
+      <Link className={bottomLink} href="/" {...cur(top === "home")}>
+        {I.home}Home
+      </Link>
+      <Link className={bottomLink} href="/activity" {...cur(top === "activity")}>
+        {I.activity}Activity
+      </Link>
+      <Link className={bottomLink} href={tradeUrl({ tab: "sell" })} {...cur(move)}>
+        {I.move}Move
+      </Link>
+      <Link className={bottomLink} href="/recurring" {...cur(top === "recurring")}>
+        {I.recurring}Recurring
+      </Link>
+      <Link className={bottomLink} href="/wallet" {...cur(top === "wallet")}>
+        {I.wallet}Wallet
+      </Link>
     </nav>
   );
 }
 
-/** Renders the page once localStorage state is loaded; replays the enter animation on route change. */
-export function View({ children }: { children: ReactNode }) {
+/** Master/detail selections (`/activity/:id`) keep the list's scroll position on wide screens. */
+const isSelection = (p: string) => /^\/(activity|recurring|wallet)\/(?!add|new)[^/]+$/.test(p);
+
+/** Replays the enter animation when switching sections. */
+function View({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { ready } = useApp();
   useEffect(() => {
-    scrollTo(0, 0);
+    if (!isSelection(pathname) || matchMedia("(max-width:760px)").matches) scrollTo(0, 0);
   }, [pathname]);
-  if (!ready) return null;
   return (
-    <div className="animate-view-in" key={pathname}>
+    <div className="animate-view-in" key={pathname.split("/")[1]}>
       {children}
     </div>
+  );
+}
+
+/**
+ * App frame. Waits for localStorage state, sends signed-out visitors to sign-in,
+ * and wraps signed-in screens in the sidebar shell.
+ */
+export function Frame({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { ready, db } = useApp();
+  const seg = pathname.split("/")[1];
+  const gate = ready && !db.user && !PUBLIC.includes(seg);
+  const signedInOnSignIn = ready && !!db.user && seg === "signin";
+
+  useEffect(() => {
+    loadFx();
+  }, []);
+  useEffect(() => {
+    if (gate) router.replace(signInUrl(pathname === "/" ? null : pathname + location.search));
+    if (signedInOnSignIn) router.replace(safeRet(new URLSearchParams(location.search).get("ret")));
+  }, [gate, signedInOnSignIn, pathname, router]);
+
+  if (!ready || gate || signedInOnSignIn) return null;
+
+  if (seg === "signin") return <>{children}</>;
+
+  // Public pages viewed signed out.
+  if (!db.user)
+    return (
+      <div className="relative grid min-h-screen place-items-start justify-center px-6 py-6">
+        <div className="pointer-events-none fixed inset-0 bg-glow" />
+        <div className="relative w-full max-w-[640px]">{children}</div>
+      </div>
+    );
+
+  return (
+    <>
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[76px_minmax(0,1fr)] lg:grid-cols-[252px_minmax(0,1fr)]">
+        <Sidebar />
+        <main className="min-w-0 pb-[calc(76px+env(safe-area-inset-bottom))] md:pb-0" aria-live="polite">
+          <View>{children}</View>
+        </main>
+      </div>
+      <BottomNav />
+    </>
   );
 }
 
@@ -125,7 +194,7 @@ export function Toast() {
   return (
     <div
       className={cn(
-        "pointer-events-none fixed bottom-24 left-1/2 z-[90] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas opacity-0 transition-opacity md:bottom-6",
+        "pointer-events-none fixed bottom-[92px] left-1/2 z-[90] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas opacity-0 transition-opacity md:bottom-6",
         on && "opacity-100",
       )}
       role="status"
