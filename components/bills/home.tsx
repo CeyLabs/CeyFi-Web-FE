@@ -5,6 +5,7 @@ import { Plus, Search } from "lucide-react";
 import { TxRow } from "../activity";
 import { ButtonLink, Card, Empty, Legal, ListPanel, PageHead, Pad, SectionTitle, TitleLink, col, fine } from "../ui";
 import { CAT_ICON, CATS, SavedRow } from "./shared";
+import { cn } from "cn";
 import { useBillers, useLiveSaved } from "@/hooks/bills";
 import { lkr } from "@/lib/format";
 import { billsUrl } from "@/lib/params";
@@ -96,7 +97,7 @@ export function SavedBillers() {
         }
       />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <ListPanel>
             {saved.length ? (
               saved.map((b) => <SavedRow key={b.id} db={db} b={b} detail />)
@@ -127,7 +128,7 @@ export function BillHistory() {
     <>
       <PageHead title="Bill payments" back={billsUrl()} backAlways />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <div className="grid grid-cols-2 gap-2.5">
             <Card className={stat}>
               <div className={fine}>Paid this month</div>

@@ -128,7 +128,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
     <>
       <PageHead title="Pay bill" back={sb ? billsUrl() : billsUrl({ step: "account", biller: b.id })} backAlways />
       <Pad>
-        <div className={cn(col, "pt-1")}>
+        <div className={cn(col, "mx-auto pt-1")}>
           <div className="mb-4 flex items-center gap-3">
             <CpLogo cp={billerCp(b)} />
             <div className="min-w-0 flex-1">
@@ -407,7 +407,7 @@ export function Paid({ id }: { id: string | null }) {
     <>
       <PageHead title={title} back={billsUrl()} backAlways />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           {phase === "checkout" ? (
             <Checkout p={p} via={via} usdt={usdt} />
           ) : (
