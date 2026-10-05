@@ -44,7 +44,9 @@ export const fxQuery = () =>
   queryOptions({
     queryKey: ["fx"],
     queryFn: async (): Promise<Fx> => {
-      const r = await fetch(FX_BASE + "/currencies", { signal: AbortSignal.timeout(5000), cache: "no-store" });
+      // Through our own route: the feed blocks browser requests (CORS).
+      const r = await fetch("/api/fx", { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`FX ${r.status}`);
       const d = (await r.json()) as FxData;
       const usd = d?.USD?.[FX_FIELD];
       if (!usd) throw new Error("No USD rate");
