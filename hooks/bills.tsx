@@ -79,7 +79,7 @@ function txFields(p: BillPayment): Partial<Tx> {
 
 /** Keeps a local Activity entry in step with its server payment while it's on screen. */
 export function useSyncBillTx(t: Tx | undefined) {
-  const { data } = useBillPayment(t?.payment_id);
+  const { data } = useBillPayment(t?.kind === "bill" ? t.payment_id : undefined);
   useEffect(() => {
     if (!t || !data) return;
     const next = txFields(data);
@@ -96,5 +96,5 @@ function SyncOne({ t }: { t: Tx }) {
 /** Mounted once in the app frame: keeps every in-flight bill payment in Activity up to date, wherever the user is. */
 export function BillTxSync() {
   const { db } = useApp();
-  return db.tx.filter((t) => t.payment_id && isLive(t.state)).map((t) => <SyncOne key={t.id} t={t} />);
+  return db.tx.filter((t) => t.kind === "bill" && t.payment_id && isLive(t.state)).map((t) => <SyncOne key={t.id} t={t} />);
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import { CalendarCheck, FileText, LifeBuoy, Share } from "lucide-react";
-import { useEffect } from "react";
-import { Alert, Button, ButtonLink, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Stat, StepDot, fine } from "./ui";
+import { Alert, ButtonLink, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Stat, StepDot, fine } from "./ui";
 import { cn } from "cn";
 import { fmt, dLong, dShort, dTime, lkr } from "@/lib/format";
-import { M, advance, isLive, mName, stLabel, txTitle, txVia, type DB, type Tx } from "@/lib/backend";
+import { M, isLive, stLabel, txTitle, txVia, type DB, type Tx } from "@/lib/backend";
+import { useAdvance } from "@/hooks/activity";
 import { useSyncBillTx } from "@/hooks/bills";
-import { activityTxUrl, activityUrl, billsUrl, infoUrl } from "@/lib/params";
+import { activityTxUrl, activityUrl, billsUrl, infoUrl, tradeUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -22,20 +22,6 @@ export function ActivityTabs({ on }: { on: "history" | "recurring" }) {
       ]}
     />
   );
-}
-
-/** Moves a live transaction along while it's on screen. */
-export function useAdvance(t: Tx | undefined) {
-  const live = !!t && isLive(t.state);
-  useEffect(() => {
-    if (!t || !live) return;
-    const iv = setInterval(() => {
-      const prev = t.state;
-      advance(t);
-      if (t.state !== prev) commit();
-    }, 600);
-    return () => clearInterval(iv);
-  }, [t, live]);
 }
 
 const amountOf = (t: Tx) => (t.lkr ? lkr(t.lkr) : t.quoted_lkr ? lkr(t.quoted_lkr) : "—");
@@ -77,7 +63,7 @@ function Timeline({ db, t }: { db: DB; t: Tx }) {
   const i = O.indexOf(t.state);
   const fi = ({ charge_failed: 0, rate_changed: 1, refund_requested: 1, payout_failed: 2 } as Record<string, number>)[t.state] ?? -1;
   const N: [string, string][] = [
-    ["USDT collected", `${fmt(t.usdt)} USDT from ${mName(M(db, t.method_id))}`],
+    ["USDT collected", `${fmt(t.usdt)} USDT from ${txVia(db, t)}`],
     ["Converted to rupees", t.rate ? `At LKR ${fmt(t.rate)} per USDT` : "At the protected rate"],
     ["Sent by CEFT", `To ${t.payee?.bank} ${t.payee?.account}`],
     ["Delivered", t.bank_ref ? `Bank ref ${t.bank_ref}` : "Usually within minutes"],
@@ -137,23 +123,13 @@ export function TxDetail({ t }: { t: Tx }) {
           <Timeline db={db} t={t} />
         </DCard>
       )}
-      {t.state === "rate_changed" && (
-        <>
-          <Alert tone="warn">
-            The rate moved after you paid. {t.kind === "sell" ? "You’d" : "They’d"} now receive <b>{lkr(t.new_lkr)}</b> instead of {lkr(t.quoted_lkr)}.
-            Nothing has been sent yet.
-          </Alert>
-          <Button size="lg" className="mt-2.5" onClick={() => commit(() => void advance(t, "accept"))}>
-            Accept {lkr(t.new_lkr)}
-          </Button>
-          <Button variant="ghost" size="lg" className="mt-2" onClick={() => commit(() => void advance(t, "refund"))}>
-            Cancel and request a refund
-          </Button>
-        </>
-      )}
       {t.message && !live && t.state !== "completed" && <Alert>{t.message}</Alert>}
       {t.payment_id && t.state === "charging" ? (
-        <ButtonLink size="lg" className="mt-3" href={billsUrl({ step: "paid", tx: t.payment_id })}>
+        <ButtonLink
+          size="lg"
+          className="mt-3"
+          href={t.kind === "sell" ? tradeUrl({ tab: "sell", step: "status", id: t.payment_id }) : billsUrl({ step: "paid", tx: t.payment_id })}
+        >
           Finish paying in {txVia(db, t)}
         </ButtonLink>
       ) : (
@@ -190,16 +166,18 @@ export function TxDetail({ t }: { t: Tx }) {
             <DRow label={t.kind === "sell" ? "Sold" : "Sent"}>
               <span className="font-mono">{fmt(t.usdt)} USDT</span>
             </DRow>
-            <DRow label="Fees">
-              <span className="font-mono">{fmt(t.fees_usdt)} USDT</span>
-            </DRow>
+            {t.fees_usdt !== undefined && (
+              <DRow label="Fees">
+                <span className="font-mono">{fmt(t.fees_usdt)} USDT</span>
+              </DRow>
+            )}
             {t.rate ? (
               <DRow label="Rate">
                 <span className="font-mono">1 USDT = LKR {fmt(t.rate)}</span>
               </DRow>
             ) : null}
-            <DRow label={t.kind === "sell" ? "You received" : "They received"} strong>
-              <span className="font-mono">{lkr(t.lkr || 0)}</span>
+            <DRow label={t.state !== "completed" ? (t.kind === "sell" ? "You receive" : "They receive") : t.kind === "sell" ? "You received" : "They received"} strong>
+              <span className="font-mono">{lkr(t.lkr || t.quoted_lkr || 0)}</span>
             </DRow>
           </>
         ) : (

@@ -47,7 +47,7 @@ export function SavedRow({ db, b, detail }: { db: DB; b: SavedBiller; detail?: b
 export function Pending({ error, onRetry, label = "Loading billers" }: { error?: Error | null; onRetry?: () => void; label?: string }) {
   if (error)
     return (
-      <Empty title="Couldn’t load billers">
+      <Empty title="Couldn’t load this">
         {error.message}
         <br />
         {onRetry && (
@@ -66,13 +66,13 @@ export function Pending({ error, onRetry, label = "Loading billers" }: { error?:
 }
 
 /** Shown when a step's URL points at a biller or payment that doesn't exist. */
-export function Missing({ title }: { title: string }) {
+export function Missing({ title, section = "Bills", href = billsUrl() }: { title: string; section?: string; href?: string }) {
   return (
     <>
-      <PageHead title="Bills" back={billsUrl()} backAlways />
+      <PageHead title={section} back={href} backAlways />
       <Empty title={title}>
-        <ButtonLink size="sm" href={billsUrl()} className="mt-2">
-          Back to Bills
+        <ButtonLink size="sm" href={href} className="mt-2">
+          Back to {section}
         </ButtonLink>
       </Empty>
     </>

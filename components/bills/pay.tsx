@@ -1,8 +1,7 @@
 "use client";
 
-import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useRef, useState } from "react";
 import { CurLkr, amountBox, amountInput, amountLabel, curChip } from "../trade/composer";
 import {
@@ -18,8 +17,6 @@ import {
   PageHead,
   Pad,
   Panel,
-  tile,
-  tileOn,
   RiskNote,
   Sheet,
   Tick,
@@ -29,32 +26,28 @@ import {
   inputCls,
   useArmed,
   useErrors,
-  useNow,
 } from "../ui";
 import { Missing, Pending } from "./shared";
+import { CheckoutPanel, ProviderPicker } from "../pay-with";
 import { cn } from "cn";
 import { BILL_CATS, EMAIL_RE, MOBILE_RE, PNAME, type Provider } from "@/lib/config";
-import { fmt, lkr, uid } from "@/lib/format";
-import { rate, refreshFx, useFx } from "@/lib/fx";
+import { fmt, lkr, toNum, uid } from "@/lib/format";
+import { useRate } from "@/hooks/fx";
 import { billerCp, lastPaid, newTx, txTitle } from "@/lib/backend";
-import { PROVIDER_CODE, billPhase, checkoutQr, expiresAt, providerOf, type BillCheck, type Biller, type BillPayment } from "@/lib/api/bills";
+import { PROVIDER_CODE, billPhase, providerOf, type BillCheck, type Biller, type BillPayment } from "@/lib/api/bills";
 import { isClientError } from "@/lib/api/client";
 import { useBillCheck, useBillPayment, useBiller, useCreateBillPayment, useSyncBillTx } from "@/hooks/bills";
 import { billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
-const toNum = (amt: string) => Number(amt.replace(/,/g, "")) || 0;
 const QUICK = [2500, 5000, 10000];
-const PROVIDERS: Provider[] = ["binance", "bybit", "kucoin"];
-/** Logos copied from CeyPay-FE. `-dark` has white lettering for the dark theme. */
-const PM_LOGO: Record<Provider, string> = { binance: "/pay-methods/binance-pay", bybit: "/pay-methods/bybit-pay", kucoin: "/pay-methods/kucoin-pay" };
 
 /** Amount and pay partner for one biller account, then a review sheet. */
 export function PayBill({ saved, code, acct }: { saved: string | null; code: string | null; acct: string | null }) {
   const router = useRouter();
   const { db } = useApp();
-  useFx(); // re-estimate when rates refresh
+  const rate = useRate();
   const sb = saved ? db.billers.find((x) => x.id === saved) : undefined;
   const account = sb ? sb.account : (acct || "").trim();
   const { biller: b, isPending, error, refetch } = useBiller(sb ? sb.code : code);
@@ -71,10 +64,6 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
     router.replace(billsUrl());
   });
 
-  useEffect(() => {
-    const id = setInterval(() => refreshFx(), 30000);
-    return () => clearInterval(id);
-  }, []);
   useEffect(() => {
     if (b && matchMedia("(min-width:761px)").matches) input.current?.focus();
   }, [b]);
@@ -100,7 +89,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   const amount = typed ?? (due ? String(due) : "");
   const a = toNum(amount);
   // Estimate only: the backend sets the exact USDT amount when it creates the payment.
-  const usdt = a ? a / rate() : 0;
+  const usdt = a ? a / rate : 0;
   // Shortcuts: the amount due, the last payment, then round amounts. First tag wins on duplicates.
   const quick = [...(due ? ([[due, "Due"]] as const) : []), ...(last?.lkr ? ([[last.lkr, "Last"]] as const) : []), ...QUICK.map((v) => [v, ""] as const)]
     .filter(([v], i, l) => v >= min && v <= max && l.findIndex(([w]) => w === v) === i);
@@ -201,28 +190,12 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
           </div>
 
           <div className={cn(fine, "mt-6 mb-2")}>Pay with</div>
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pay with">
-            {PROVIDERS.map((k) => (
-              <button
-                key={k}
-                role="radio"
-                aria-checked={k === provider}
-                aria-label={`${PNAME[k]} Pay`}
-                className={cn(tile, "h-16 items-center justify-center p-3", k === provider && tileOn)}
-                onClick={() => setPicked(k)}
-              >
-                {/* eslint-disable @next/next/no-img-element -- static SVG logos; next/image adds nothing here */}
-                <img src={`${PM_LOGO[k]}-dark.svg`} alt="" className="on-dark h-5 w-full object-contain" />
-                <img src={`${PM_LOGO[k]}.svg`} alt="" className="on-light h-5 w-full object-contain" />
-                {/* eslint-enable @next/next/no-img-element */}
-              </button>
-            ))}
-          </div>
+          <ProviderPicker value={provider} onChange={setPicked} />
           <p className={cn(fine, "mt-2")}>You’ll approve the payment in the {PNAME[provider]} app.</p>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 text-[12.5px] text-muted">
             <span>
-              1 USDT ≈ <span className="font-mono text-fg">LKR {fmt(rate())}</span>
+              1 USDT ≈ <span className="font-mono text-fg">LKR {fmt(rate)}</span>
             </span>
             <span>Biller fee: free</span>
             <span className="flex items-center gap-1.5">
@@ -525,39 +498,10 @@ function PaymentRows({ p, via, usdt, collected = true }: { p: BillPayment; via: 
 
 /** Waiting for the user to approve in their exchange. Polling flips the screen when the USDT arrives. */
 function Checkout({ p, via, usdt }: { p: BillPayment; via: string; usdt?: number }) {
-  const now = useNow(1000);
-  const exp = expiresAt(p);
-  const left = exp ? Math.max(0, exp - now) : null;
-  const mm = left !== null ? `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}` : null;
-  const qr = checkoutQr(p);
-
   return (
-    <Panel className="text-center">
-      <div className={fine}>Approve in {via}</div>
-      <div className="mt-1 font-mono text-[28px] tracking-[-.5px] text-ink">{usdt ? `${fmt(usdt)} USDT` : lkr(p.amount)}</div>
-      <div className={fine}>for {lkr(p.amount)}</div>
-      {qr && (
-        // Scanning makes sense on a computer; on a phone the button opens the app directly.
-        <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 max-md:hidden">
-          {qr.kind === "image" ? (
-            // eslint-disable-next-line @next/next/no-img-element -- inline data URL from the backend; nothing for next/image to optimise
-            <img src={qr.src} alt={`${via} QR code`} width={184} height={184} className="block size-[184px]" />
-          ) : (
-            <QRCodeSVG value={qr.value} size={184} />
-          )}
-        </div>
-      )}
-      <p className={cn(fine, "mt-3 max-md:hidden")}>Scan with the {via.replace(" Pay", "")} app, or open checkout below.</p>
-      {p.checkoutLink && (
-        <a className="mt-4 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-brand px-3.5 text-base font-medium text-white hover:bg-brand-hover" href={p.deepLink || p.checkoutLink} target="_blank" rel="noopener noreferrer">
-          Open {via} <ExternalLink size={16} />
-        </a>
-      )}
-      <div className={cn(fine, "mt-3 flex items-center justify-center gap-2")}>
-        <Loader2 size={14} className="animate-spin" /> Waiting for your payment{mm && ` · expires in ${mm}`}
-      </div>
+    <CheckoutPanel checkout={p} via={via} amount={usdt ? `${fmt(usdt)} USDT` : lkr(p.amount)} sub={`for ${lkr(p.amount)}`}>
       <PaymentRows p={p} via={via} usdt={usdt} />
-    </Panel>
+    </CheckoutPanel>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { ActivityTabs, TxDetail, TxRow } from "@/components/activity";
+import { TxDetail, TxRow } from "@/components/activity";
 import { ButtonLink, Empty, ListGroup, MasterDetail, PageHead, SearchBox } from "@/components/ui";
 import { dMonth } from "@/lib/format";
 import { M, mName, txTitle, type Tx } from "@/lib/backend";
@@ -30,7 +30,6 @@ export default function ActivityPage() {
         placeholder="Select a transaction to see the details"
         list={
           <>
-          <ActivityTabs on="history" />
           {groups.size ? (
             [...groups].map(([k, v]) => (
               <div key={k}>

@@ -17,7 +17,9 @@ export const parseAsReturnPath = createParser({
 export const tradeParams = {
   tab: parseAsStringLiteral(["sell", "send", "buy"] as const).withDefault("sell"),
   /** Sub-view on top of the composer. */
-  step: parseAsStringLiteral(["review", "payee"] as const),
+  step: parseAsStringLiteral(["review", "payee", "status"] as const),
+  /** Status: the sale (CeyFi payment id). */
+  id: parseAsString,
 };
 export type TradeTab = inferParserType<typeof tradeParams>["tab"];
 const tradeSer = createSerializer(tradeParams);

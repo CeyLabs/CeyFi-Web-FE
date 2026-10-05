@@ -1,6 +1,8 @@
 export const fmt = (n: number | undefined | null, d = 2) =>
   Number(n || 0).toLocaleString("en-LK", { minimumFractionDigits: d, maximumFractionDigits: d });
 export const lkr = (n: number | undefined | null) => "LKR " + fmt(n);
+/** A typed amount ("1,250.5") as a number; 0 when empty or invalid. */
+export const toNum = (amt: string) => Number(amt.replace(/,/g, "")) || 0;
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const initials = (n: string | undefined | null) =>
   String(n || "?")

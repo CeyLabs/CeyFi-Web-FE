@@ -3,13 +3,12 @@
 import { useRouter } from "next/navigation";
 import { IdCard, Lock, ScanFace, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { Button, ButtonLink, Empty, Field, PageHead, Pad, Panel, StepDot, Tick, TwoCol, col, inputCls, selectCls, useErrors } from "../ui";
+import { Button, ButtonLink, Empty, ErrorBox, Field, PageHead, Pad, Panel, StepDot, Tick, col, inputCls, selectCls, useErrors } from "../ui";
 import { cn } from "cn";
-import { BANKS, CFG, MOBILE_RE } from "@/lib/config";
-import { uid } from "@/lib/format";
-import type { Kyc, Payee } from "@/lib/backend";
+import type { Kyc } from "@/lib/backend";
 import { kycReturn, useKyc, useStartKyc } from "@/hooks/kyc";
-import { commit, useApp } from "@/lib/store";
+import { useAddBank, useBankList } from "@/hooks/sell";
+import { useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
 type FlowProps = { ret: string | null };
@@ -143,60 +142,56 @@ export function Verify({ ret }: FlowProps) {
   );
 }
 
-export function AddPayee({ ret, self }: FlowProps & { self: boolean }) {
+/** Add a payout bank account. The backend matches the holder name to the verified identity; a mismatch goes to review. */
+export function AddPayee({ ret }: FlowProps) {
   const router = useRouter();
   const back = ret ?? "/account";
   const { db } = useApp();
+  const banks = useBankList();
+  const add = useAddBank();
   const [bankCode, setBankCode] = useState("");
   const [acct, setAcct] = useState("");
-  const [name, setName] = useState(self ? db.user?.name || "" : "");
-  const [relationship, setRelationship] = useState(CFG.relationships[0]);
-  const [nickname, setNickname] = useState("");
-  const [mobile, setMobile] = useState("");
-  const { errs, clear, check } = useErrors(["pb", "pa", "pn", "pm"] as const);
+  const [name, setName] = useState(db.user?.name || "");
+  const [branch, setBranch] = useState("");
+  const { errs, clear, check } = useErrors(["pb", "pa", "pn"] as const);
 
   const save = () => {
-    const bank = BANKS.find((b) => String(b.code) === bankCode);
-    const num = acct.replace(/\s/g, ""),
-      holder = name.trim(),
-      mob = mobile.replace(/[^\d+]/g, "");
-    const dup = db.payees.some((p) => p.bank_code === bank?.code && p.account_number === num && p.is_self === self);
+    const num = acct.replace(/[\s-]/g, ""),
+      holder = name.trim();
     const ok = check({
-      pb: bank ? "" : "Choose a bank",
-      pa: /^\d{6,20}$/.test(num) ? (dup ? "You’ve already saved this account" : "") : "Account number should be 6 to 20 digits",
+      pb: bankCode ? "" : "Choose a bank",
+      pa: /^\d{6,20}$/.test(num) ? "" : "Account number should be 6 to 20 digits",
       pn: holder.length >= 3 ? "" : "Enter the account holder’s name",
-      pm: self || !mob || MOBILE_RE.test(mob) ? "" : "Mobile should look like 07X XXX XXXX",
     });
-    if (!ok || !bank) return;
-    const p: Payee = {
-      id: uid("pay_"),
-      is_self: self,
-      bank_code: bank.code,
-      bank_name: bank.name,
-      account_number: num,
-      account_name: holder,
-      nickname: nickname.trim() || holder.split(" ")[0],
-      relationship: self ? "Self" : relationship,
-      mobile: self ? null : mob || null,
-    };
-    commit((db, d) => {
-      db.payees.unshift(p);
-      d.payee[self ? "sell" : "send"] = p.id;
-    });
-    toast("Saved");
-    router.push(back);
+    if (!ok || add.isPending) return;
+    add.mutate(
+      { bankCode: Number(bankCode), accountNumber: num, accountName: holder, branch: branch.trim() || undefined },
+      {
+        onSuccess: (b) => {
+          toast(b.status === "VERIFIED" ? "Bank account added" : "Added. We’ll review it, as the name differs from your ID");
+          router.push(back);
+        },
+      },
+    );
   };
 
   return (
     <>
-      <PageHead title={self ? "Add your bank account" : "Add a recipient"} back={back} />
+      <PageHead title="Add your bank account" back={back} />
       <Pad>
         <div className={col}>
           <Panel>
             <Field id="pb" label="Bank" error={errs.pb} className="mt-0">
-              <select className={selectCls} id="pb" aria-invalid={!!errs.pb} value={bankCode} onChange={(e) => (setBankCode(e.target.value), clear("pb"))}>
-                <option value="">Choose bank</option>
-                {BANKS.map((b) => (
+              <select
+                className={selectCls}
+                id="pb"
+                aria-invalid={!!errs.pb}
+                disabled={!banks.data}
+                value={bankCode}
+                onChange={(e) => (setBankCode(e.target.value), clear("pb"))}
+              >
+                <option value="">{banks.data ? "Choose bank" : banks.error ? "Couldn’t load banks" : "Loading banks…"}</option>
+                {banks.data?.map((b) => (
                   <option key={b.code} value={b.code}>
                     {b.name}
                   </option>
@@ -206,39 +201,16 @@ export function AddPayee({ ret, self }: FlowProps & { self: boolean }) {
             <Field id="pa" label="Account number" error={errs.pa}>
               <input className={cn(inputCls, "font-mono")} id="pa" aria-invalid={!!errs.pa} inputMode="numeric" autoComplete="off" value={acct} onChange={(e) => (setAcct(e.target.value), clear("pa"))} />
             </Field>
-            <Field id="pn" label="Account holder name" error={errs.pn} hint={self ? "Must match your verified identity." : undefined}>
-              <input className={inputCls} id="pn" aria-invalid={!!errs.pn} value={name} onChange={(e) => (setName(e.target.value), clear("pn"))} readOnly={self} />
+            <Field id="pn" label="Account holder name" error={errs.pn} hint="As registered with the bank. It must be your account, in the name on your ID.">
+              <input className={inputCls} id="pn" aria-invalid={!!errs.pn} value={name} onChange={(e) => (setName(e.target.value), clear("pn"))} />
             </Field>
-            {!self && (
-              <>
-                <TwoCol>
-                  <Field id="pr" label="Relationship">
-                    <select className={selectCls} id="pr" value={relationship} onChange={(e) => setRelationship(e.target.value)}>
-                      {CFG.relationships.map((x) => (
-                        <option key={x}>{x}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field id="pk" label="Nickname">
-                    <input className={inputCls} id="pk" placeholder="e.g. Amma" value={nickname} onChange={(e) => setNickname(e.target.value)} />
-                  </Field>
-                </TwoCol>
-                <Field id="pm" label="Their mobile (optional, for an SMS alert)" error={errs.pm}>
-                  <input
-                    className={cn(inputCls, "font-mono")}
-                    id="pm"
-                    aria-invalid={!!errs.pm}
-                    inputMode="tel"
-                    placeholder="07X XXX XXXX"
-                    value={mobile}
-                    onChange={(e) => (setMobile(e.target.value), clear("pm"))}
-                  />
-                </Field>
-              </>
-            )}
-            <Button size="lg" className="mt-4" onClick={save}>
-              Save
+            <Field id="pr" label="Branch (optional)">
+              <input className={inputCls} id="pr" placeholder="e.g. Colombo 03" value={branch} onChange={(e) => setBranch(e.target.value)} />
+            </Field>
+            <Button size="lg" className="mt-4" disabled={add.isPending} onClick={save}>
+              {add.isPending ? "Saving…" : "Save"}
             </Button>
+            {add.error && <ErrorBox>{add.error.message}</ErrorBox>}
           </Panel>
         </div>
       </Pad>

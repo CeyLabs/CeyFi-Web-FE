@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useQueryStates } from "nuqs";
 import { Button, ButtonLink, ConfirmButton, CpLogo, Empty, Kv, LRow, Legal, ListPanel, NavKv, PageHead, Pad, Panel, SectionTitle, Stat, TitleLink, TwoCol, col } from "@/components/ui";
 import { AddPayee, Verify } from "@/components/account/flows";
-import { CFG, bankShort } from "@/lib/config";
-import { fmt, initials, mask } from "@/lib/format";
-import { daySpent } from "@/lib/backend";
+import { Pending } from "@/components/bills/shared";
+import { initials, lkr } from "@/lib/format";
+import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
 import { useSignInMethods, useSignOut } from "@/hooks/auth";
-import { commit, useApp } from "@/lib/store";
+import { useBanks, useRemoveBank, useSellLimits, useSetDefaultBank } from "@/hooks/sell";
+import { useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { accountParams, accountUrl, infoUrl } from "@/lib/params";
 
@@ -17,6 +18,7 @@ function Overview() {
   const router = useRouter();
   const { db } = useApp();
   const methods = useSignInMethods();
+  const { data: limits } = useSellLimits();
   const signOut = useSignOut();
   const u = db.user;
   if (!u) return null; // the frame asks for sign-in first
@@ -63,47 +65,11 @@ function Overview() {
                 </ButtonLink>
               )}
             </Kv>
-            <Kv label="Daily limit">
-              {fmt(daySpent(db))} / {CFG.daily_limit_usdt.toLocaleString()} USDT
-            </Kv>
-            <Kv label="Bank accounts &amp; recipients">{db.payees.length}</Kv>
+            <Kv label="Per sale">{limits ? `${lkr(limits.min)} – ${lkr(limits.max)}` : "—"}</Kv>
+            <Kv label="Left today">{limits ? `${lkr(limits.remaining)} of ${lkr(limits.daily)}` : "—"}</Kv>
           </Panel>
 
-          <SectionTitle
-            action={
-              <TitleLink href={accountUrl({ flow: "payee" })}>
-                <Plus size={14} /> Add
-              </TitleLink>
-            }
-          >
-            Bank accounts &amp; recipients
-          </SectionTitle>
-          <ListPanel>
-            {db.payees.length ? (
-              db.payees.map((p) => (
-                <LRow
-                  key={p.id}
-                  variant="w3"
-                  as="div"
-                  logo={<CpLogo cp={{ kind: "person", name: p.account_name }} />}
-                  title={p.is_self ? "My " + bankShort(p.bank_name) : p.nickname || p.account_name}
-                  sub={`${p.bank_name} ${mask(p.account_number)} · ${p.relationship}`}
-                  end={
-                    <ConfirmButton
-                      variant="danger"
-                      size="sm"
-                      className="font-sans"
-                      label="Remove"
-                      armedLabel="Confirm"
-                      onConfirm={() => commit((db) => void (db.payees = db.payees.filter((x) => x.id !== p.id)))}
-                    />
-                  }
-                />
-              ))
-            ) : (
-              <Empty className="py-[22px]">None yet</Empty>
-            )}
-          </ListPanel>
+          <BankAccounts />
 
           <Help />
 
@@ -137,6 +103,83 @@ function Overview() {
   );
 }
 
+/** Payout bank accounts, from the backend. Only available once identity is verified. */
+function BankAccounts() {
+  const { db } = useApp();
+  const { data, error, refetch } = useBanks();
+  const setDefault = useSetDefaultBank();
+  const remove = useRemoveBank();
+  const verified = db.kyc === "verified";
+
+  return (
+    <>
+      <SectionTitle
+        action={
+          verified && (
+            <TitleLink href={accountUrl({ flow: "payee", ret: "/account" })}>
+              <Plus size={14} /> Add
+            </TitleLink>
+          )
+        }
+      >
+        Bank accounts
+      </SectionTitle>
+      <ListPanel>
+        {!verified ? (
+          <Empty className="py-[22px]">Verify your identity to add a bank account.</Empty>
+        ) : !data ? (
+          <Pending error={error} onRetry={() => refetch()} label="Loading your bank accounts" />
+        ) : data.length ? (
+          data.map((b) => {
+            const st = BANK_STATUS[b.status];
+            return (
+              <LRow
+                key={b.id}
+                variant="w3"
+                as="div"
+                logo={<CpLogo cp={{ kind: "person", name: b.accountName }} />}
+                title={b.accountName}
+                sub={b.status === "REJECTED" && b.rejectionReason ? b.rejectionReason : bankLabel(b)}
+                end={
+                  <span className="flex items-center gap-1.5">
+                    {st ? (
+                      <Stat tone={st.tone} className="font-sans">
+                        {st.label}
+                      </Stat>
+                    ) : b.isDefault ? (
+                      <Stat className="font-sans">Default</Stat>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="font-sans"
+                        disabled={setDefault.isPending}
+                        onClick={() => setDefault.mutate(b.id, { onError: (e) => toast(e.message) })}
+                      >
+                        Make default
+                      </Button>
+                    )}
+                    <ConfirmButton
+                      variant="danger"
+                      size="sm"
+                      className="font-sans"
+                      label="Remove"
+                      armedLabel="Confirm"
+                      onConfirm={() => remove.mutate(b.id, { onSuccess: () => toast("Removed"), onError: (e) => toast(e.message) })}
+                    />
+                  </span>
+                }
+              />
+            );
+          })
+        ) : (
+          <Empty className="py-[22px]">None yet. Add one to sell USDT.</Empty>
+        )}
+      </ListPanel>
+    </>
+  );
+}
+
 const Help = () => (
   <>
     <SectionTitle>Help</SectionTitle>
@@ -151,8 +194,8 @@ const Help = () => (
 
 /** Account overview, or a setup flow via `?flow=verify|payee&ret=…`. */
 export default function AccountPage() {
-  const [{ flow, ret, self }] = useQueryStates(accountParams);
+  const [{ flow, ret }] = useQueryStates(accountParams);
   if (flow === "verify") return <Verify ret={ret} />;
-  if (flow === "payee") return <AddPayee ret={ret} self={self} />;
+  if (flow === "payee") return <AddPayee ret={ret} />;
   return <Overview />;
 }

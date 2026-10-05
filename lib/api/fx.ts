@@ -1,8 +1,6 @@
-"use client";
-
-import { useSyncExternalStore } from "react";
-import { CFG } from "./config";
-import { dLong } from "./format";
+import { queryOptions } from "@tanstack/react-query";
+import { CFG } from "../config";
+import { dLong } from "../format";
 
 /* FX rates from fx.ceyloncash.com, with a bundled snapshot when the live feed can't be reached. */
 
@@ -38,45 +36,29 @@ const SNAPSHOT = {
 /** USD TT buying rate over the last 14 days; the last point follows the live feed. */
 const HIST = [324.5, 324.5, 324.5, 325.25, 328, 328, 326, 326, 326, 327, 325.5, 325, 326.5, 326.25];
 
-type Fx = { data: FxData; source: "live" | "snapshot"; checked: number; hist: number[] };
-let fx: Fx = { data: SNAPSHOT, source: "snapshot", checked: 0, hist: HIST };
-const listeners = new Set<() => void>();
-const set = (p: Partial<Fx>) => {
-  fx = { ...fx, ...p };
-  listeners.forEach((l) => l());
-};
+export type Fx = { data: FxData; source: "live" | "snapshot"; hist: number[] };
+/** Shown until the live feed answers, and kept when it can't be reached. */
+export const SNAPSHOT_FX: Fx = { data: SNAPSHOT, source: "snapshot", hist: HIST };
 
-let inflight: Promise<void> | null = null;
-export function loadFx() {
-  inflight ??= (async () => {
-    try {
+export const fxQuery = () =>
+  queryOptions({
+    queryKey: ["fx"],
+    queryFn: async (): Promise<Fx> => {
       const r = await fetch(FX_BASE + "/currencies", { signal: AbortSignal.timeout(5000), cache: "no-store" });
       const d = (await r.json()) as FxData;
       const usd = d?.USD?.[FX_FIELD];
       if (!usd) throw new Error("No USD rate");
-      set({ data: d, source: "live", checked: Date.now(), hist: [...HIST.slice(0, -1), usd] });
-    } catch {
-      set({ checked: Date.now() });
-    } finally {
-      inflight = null;
-    }
-  })();
-  return inflight;
-}
-
-/** Refresh when the last check is older than `maxAge`. */
-export const refreshFx = (maxAge = 5 * 60e3) => (Date.now() - fx.checked > maxAge ? loadFx() : undefined);
-
-const subscribe = (l: () => void) => {
-  listeners.add(l);
-  return () => listeners.delete(l);
-};
-export const useFx = () => useSyncExternalStore(subscribe, () => fx, () => fx);
+      return { data: d, source: "live", hist: [...HIST.slice(0, -1), usd] };
+    },
+    staleTime: 5 * 60e3,
+    refetchInterval: 5 * 60e3,
+    retry: 1,
+  });
 
 /** LKR per USDT before fees: CeylonCash USD TT buying. */
-export const rate = () => Math.round((fx.data.USD?.[FX_FIELD] || CFG.base_rate) * 100) / 100;
+export const rateOf = (fx: Fx) => Math.round((fx.data.USD?.[FX_FIELD] || CFG.base_rate) * 100) / 100;
 
-export const fxDate = (f: Fx = fx) => {
+export const fxDate = (f: Fx) => {
   const k = f.data._meta?.as_of;
   return k ? dLong(`${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6)}`) : "—";
 };

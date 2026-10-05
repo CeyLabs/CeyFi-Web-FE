@@ -7,7 +7,8 @@ import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search } from "luc
 import { cn } from "cn";
 import { CFG, PNAME } from "@/lib/config";
 import { fmt, hue, initials, phone } from "@/lib/format";
-import { fxDate, useFx } from "@/lib/fx";
+import { fxDate } from "@/lib/api/fx";
+import { useFx } from "@/hooks/fx";
 import { isExpired, spentBy, type Counterparty, type DB, type Method } from "@/lib/backend";
 import { infoUrl } from "@/lib/params";
 import { openSignIn } from "@/lib/auth";

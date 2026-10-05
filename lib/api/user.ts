@@ -1,3 +1,4 @@
+import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
 
 /* CeyFi user API. The backend finds-or-creates the user from the Privy access token. */
@@ -14,3 +15,5 @@ export type Me = {
 };
 
 export const getMe = () => api<Me>("/ceyfi/user/me", { auth: true });
+
+export const meQuery = () => queryOptions({ queryKey: ["ceyfi", "me"], queryFn: getMe });

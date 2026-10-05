@@ -50,7 +50,9 @@ export async function api<T>(path: string, { auth, ...init }: Init = {}): Promis
     throw new ApiError(0, "Can’t reach CeyPay. Check your connection and try again.");
   }
   if (!res.ok) throw await errorOf(res);
-  return res.json() as Promise<T>;
+  // 204s and empty bodies (DELETE, PATCH) have nothing to parse.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** 4xx means the request itself is wrong, so retrying won't help. */

@@ -20,7 +20,7 @@ export function TradeTabs({ tab }: { tab: TradeTab }) {
         label: (
           <>
             {label}
-            {t === "buy" && <Soon className={cn(tab === t && "bg-white/20 text-white")} />}
+            {t !== "sell" && <Soon className={cn(tab === t && "bg-white/20 text-white")} />}
           </>
         ),
       }))}
