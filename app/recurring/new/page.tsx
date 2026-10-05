@@ -11,7 +11,7 @@ import { cn } from "cn";
 import { CFG, OPS, bankShort } from "@/lib/config";
 import { mask4, phone, uid } from "@/lib/format";
 import { defaultFor, eligible, mName, type Recurring, type Use } from "@/lib/backend";
-import { accountUrl, addMethodUrl, recNewParams, recNewUrl, recurringTypes } from "@/lib/params";
+import { accountUrl, addMethodUrl, recNewParams, recNewUrl, recurringTypes, tradeUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -179,7 +179,7 @@ function Form({ type }: { type: RType }) {
                 ))}
               </select>
             ) : (
-              <Link className={needRow} href={accountUrl({ flow: "payee", ret: recNewUrl("remit") })}>
+              <Link className={needRow} href={tradeUrl({ tab: "send" })}>
                 <Avatar>
                   <Plus />
                 </Avatar>

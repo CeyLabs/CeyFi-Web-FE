@@ -4,13 +4,14 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { I } from "@/components/icons";
 import { TxRow } from "@/components/activity";
-import { ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, RateBadge, RateSource, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
+import { Button, ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, RateBadge, RateSource, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
 import { cn } from "cn";
 import { dShort, fmt } from "@/lib/format";
 import { useRate, useRateHistory, useUsdtRate } from "@/hooks/fx";
 import { useBanks } from "@/hooks/sell";
 import { useApp } from "@/lib/store";
 import { accountUrl, tradeUrl } from "@/lib/params";
+import { openAddBank } from "@/lib/add-bank";
 
 const quick = "flex flex-col gap-2.5 rounded-[18px] border border-line bg-glass-subtle px-3.5 py-4 hover:border-brand";
 const quickIcon = "grid size-[38px] place-items-center rounded-xl bg-brand-soft text-brand [&_svg]:size-5";
@@ -34,9 +35,9 @@ export default function Home() {
   const chg = L ? pts[L] - pts[L - 1] : 0;
   const u = db.user;
 
-  const steps: [string, string, boolean, string][] = [
-    ["Verify your identity", "Needed to sell USDT", db.kyc === "verified", accountUrl({ flow: "verify", ret: "/" })],
-    ["Add your bank account", "Where your rupees land", !!banks.data?.length, accountUrl({ flow: "payee", ret: "/" })],
+  const steps: [string, string, boolean, { href: string } | { onClick: () => void }][] = [
+    ["Verify your identity", "Needed to sell USDT", db.kyc === "verified", { href: accountUrl({ flow: "verify", ret: "/" }) }],
+    ["Add your bank account", "Where your rupees land", !!banks.data?.length, { onClick: openAddBank }],
   ];
   const done = steps.filter((s) => s[2]).length;
 
@@ -113,11 +114,16 @@ export default function Home() {
                           <b className="block text-[14.5px] font-medium text-ink">{t}</b>
                           <small className="text-[12.5px] text-muted">{s}</small>
                         </div>
-                        {next && (
-                          <ButtonLink size="sm" className="ml-auto" href={h}>
-                            Start
-                          </ButtonLink>
-                        )}
+                        {next &&
+                          ("href" in h ? (
+                            <ButtonLink size="sm" className="ml-auto" href={h.href}>
+                              Start
+                            </ButtonLink>
+                          ) : (
+                            <Button size="sm" className="ml-auto" onClick={h.onClick}>
+                              Start
+                            </Button>
+                          ))}
                       </div>
                     );
                   })}

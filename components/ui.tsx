@@ -6,7 +6,7 @@ import { Switch } from "@base-ui/react/switch";
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search, X } from "lucide-react";
 import { cn } from "cn";
 import { CFG, PNAME } from "@/lib/config";
 import { dTime, fmt, hue, initials, phone } from "@/lib/format";
@@ -128,10 +128,13 @@ export function Segmented({ items, label, className }: { items: { href: string; 
   );
 }
 
-/** Bottom sheet on phones, centred dialog on wider screens (Base UI Dialog: focus trap, Escape and outside click close it). */
+/**
+ * Bottom sheet on phones, centred dialog on wider screens (Base UI Dialog, with focus trap and scroll lock).
+ * Closes with the X button or Escape, but not a tap outside: sheets hold forms, and a stray tap shouldn't lose them.
+ */
 export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()} disablePointerDismissal>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 min-h-dvh bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
         <Dialog.Viewport className="fixed inset-0 flex items-end justify-center md:items-center md:p-6">
@@ -140,6 +143,9 @@ export function Sheet({ open, onClose, label, children }: { open: boolean; onClo
             className="relative w-full max-w-[460px] rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] outline-none transition-[translate,opacity,scale] duration-200 ease-out data-ending-style:translate-y-6 data-ending-style:opacity-0 data-starting-style:translate-y-6 data-starting-style:opacity-0 md:rounded-[22px] md:pb-[18px] md:data-ending-style:translate-y-0 md:data-ending-style:scale-[0.98] md:data-starting-style:translate-y-0 md:data-starting-style:scale-[0.98]"
           >
             <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-line md:hidden" />
+            <Dialog.Close className={cn(iconBtn, "absolute top-3 right-3 text-muted hover:text-ink")} aria-label="Close">
+              <X />
+            </Dialog.Close>
             {children}
           </Dialog.Popup>
         </Dialog.Viewport>

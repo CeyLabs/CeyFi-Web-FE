@@ -1,15 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { IdCard, Lock, ScanFace, ShieldCheck } from "lucide-react";
-import { useState } from "react";
-import { Button, ButtonLink, Empty, ErrorBox, Field, PageHead, Pad, Panel, StepDot, Tick, col, inputCls, selectCls, useErrors } from "../ui";
+import { Button, ButtonLink, Empty, PageHead, Pad, Panel, StepDot, Tick, col } from "../ui";
 import { cn } from "cn";
 import type { Kyc } from "@/lib/backend";
 import { kycReturn, useKyc, useStartKyc } from "@/hooks/kyc";
-import { useAddBank, useBankList } from "@/hooks/sell";
 import { useApp } from "@/lib/store";
-import { toast } from "@/lib/toast";
 
 type FlowProps = { ret: string | null };
 
@@ -135,82 +131,6 @@ export function Verify({ ret }: FlowProps) {
                 Continue
               </ButtonLink>
             </Empty>
-          </Panel>
-        </div>
-      </Pad>
-    </>
-  );
-}
-
-/** Add a payout bank account. The backend matches the holder name to the verified identity; a mismatch goes to review. */
-export function AddPayee({ ret }: FlowProps) {
-  const router = useRouter();
-  const back = ret ?? "/account";
-  const { db } = useApp();
-  const banks = useBankList();
-  const add = useAddBank();
-  const [bankCode, setBankCode] = useState("");
-  const [acct, setAcct] = useState("");
-  const [name, setName] = useState(db.user?.name || "");
-  const [branch, setBranch] = useState("");
-  const { errs, clear, check } = useErrors(["pb", "pa", "pn"] as const);
-
-  const save = () => {
-    const num = acct.replace(/[\s-]/g, ""),
-      holder = name.trim();
-    const ok = check({
-      pb: bankCode ? "" : "Choose a bank",
-      pa: /^\d{6,20}$/.test(num) ? "" : "Account number should be 6 to 20 digits",
-      pn: holder.length >= 3 ? "" : "Enter the account holder’s name",
-    });
-    if (!ok || add.isPending) return;
-    add.mutate(
-      { bankCode: Number(bankCode), accountNumber: num, accountName: holder, branch: branch.trim() || undefined },
-      {
-        onSuccess: (b) => {
-          toast(b.status === "VERIFIED" ? "Bank account added" : "Added. We’ll review it, as the name differs from your ID");
-          router.push(back);
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <PageHead title="Add your bank account" back={back} />
-      <Pad>
-        <div className={col}>
-          <Panel>
-            <Field id="pb" label="Bank" error={errs.pb} className="mt-0">
-              <select
-                className={selectCls}
-                id="pb"
-                aria-invalid={!!errs.pb}
-                disabled={!banks.data}
-                value={bankCode}
-                onChange={(e) => (setBankCode(e.target.value), clear("pb"))}
-              >
-                <option value="">{banks.data ? "Choose bank" : banks.error ? "Couldn’t load banks" : "Loading banks…"}</option>
-                {banks.data?.map((b) => (
-                  <option key={b.code} value={b.code}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field id="pa" label="Account number" error={errs.pa}>
-              <input className={cn(inputCls, "font-mono")} id="pa" aria-invalid={!!errs.pa} inputMode="numeric" autoComplete="off" value={acct} onChange={(e) => (setAcct(e.target.value), clear("pa"))} />
-            </Field>
-            <Field id="pn" label="Account holder name" error={errs.pn} hint="As registered with the bank. It must be your account, in the name on your ID.">
-              <input className={inputCls} id="pn" aria-invalid={!!errs.pn} value={name} onChange={(e) => (setName(e.target.value), clear("pn"))} />
-            </Field>
-            <Field id="pr" label="Branch (optional)">
-              <input className={inputCls} id="pr" placeholder="e.g. Colombo 03" value={branch} onChange={(e) => setBranch(e.target.value)} />
-            </Field>
-            <Button size="lg" className="mt-4" disabled={add.isPending} onClick={save}>
-              {add.isPending ? "Saving…" : "Save"}
-            </Button>
-            {add.error && <ErrorBox>{add.error.message}</ErrorBox>}
           </Panel>
         </div>
       </Pad>

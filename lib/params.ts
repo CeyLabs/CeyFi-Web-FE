@@ -1,4 +1,4 @@
-import { createParser, createSerializer, parseAsBoolean, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
+import { createParser, createSerializer, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
 import { BILL_CATS, type BillCat } from "./config";
 
 type Values<T extends Record<string, unknown>> = { [K in keyof T]?: T[K] | null };
@@ -27,11 +27,9 @@ export const tradeUrl = (p: Values<inferParserType<typeof tradeParams>>) => trad
 
 export const accountParams = {
   /** Setup flow shown instead of the account overview. */
-  flow: parseAsStringLiteral(["verify", "payee"] as const),
+  flow: parseAsStringLiteral(["verify"] as const),
   /** Where to return once the flow is done. */
   ret: parseAsReturnPath,
-  /** Payee flow: adding your own bank account rather than a recipient. */
-  self: parseAsBoolean.withDefault(false),
 };
 const accountSer = createSerializer(accountParams);
 export const accountUrl = (p: Values<inferParserType<typeof accountParams>>) => accountSer("/account", p);

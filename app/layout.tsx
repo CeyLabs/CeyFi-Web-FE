@@ -4,6 +4,7 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Suspense } from "react";
 import { Frame, Toast } from "@/components/shell";
 import { PrivyAuth } from "@/components/signin";
+import { AddBankDialog } from "@/components/account/add-bank";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <Frame>{children}</Frame>
               </Suspense>
               <PrivyAuth />
+              <AddBankDialog />
               <Toast />
             </NuqsAdapter>
           </Providers>

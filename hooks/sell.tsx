@@ -107,13 +107,13 @@ export function useSelectedBank() {
 }
 
 /** What the sell button does next: the first unmet requirement wins. */
-export type SellCta = { label: string; dis?: boolean; href?: string; pick?: boolean; step?: string };
+export type SellCta = { label: string; dis?: boolean; addBank?: boolean; pick?: boolean; step?: string };
 
 /**
  * The sell composer's state: the amount (typed in USDT or LKR), a live quote, the payout account, limits,
  * and the call-to-action. Mirrors into the shared draft so Review prices the same request.
  */
-export function useSellForm({ addBankHref }: { addBankHref: string }) {
+export function useSellForm() {
   const { draft } = useApp();
   const [amount, setAmount] = useState(draft.amount);
   const [incur, setIncur] = useState(draft.incur);
@@ -136,7 +136,7 @@ export function useSellForm({ addBankHref }: { addBankHref: string }) {
   else if (quote.isError && !quote.typing && !q) cta = { label: "Check the amount", dis: true, step: quote.error.message };
   else if (!q || quote.typing) cta = { label: "Getting the best rate", dis: true };
   else if (banksPending) cta = { label: "Loading your bank accounts", dis: true };
-  else if (!bank) cta = { label: "Add your bank account", href: addBankHref };
+  else if (!bank) cta = { label: "Add your bank account", addBank: true };
   else if (bank.status === "PENDING_REVIEW")
     cta = { label: "Bank account in review", dis: true, step: "We’re checking it matches your verified name. Pick another account, or try again later." };
   else if (bank.status === "REJECTED") cta = { label: "Choose another bank account", pick: true };

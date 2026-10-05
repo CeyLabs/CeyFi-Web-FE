@@ -3,8 +3,9 @@
 import { LogOut, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQueryStates } from "nuqs";
-import { Button, ButtonLink, ConfirmButton, CpLogo, Empty, Kv, LRow, Legal, ListPanel, NavKv, PageHead, Pad, Panel, SectionTitle, Stat, TitleLink, TwoCol, col } from "@/components/ui";
-import { AddPayee, Verify } from "@/components/account/flows";
+import { Button, ButtonLink, ConfirmButton, CpLogo, Empty, Kv, LRow, Legal, ListPanel, NavKv, PageHead, Pad, Panel, SectionTitle, Stat, TwoCol, col } from "@/components/ui";
+import { Verify } from "@/components/account/flows";
+import { openAddBank } from "@/lib/add-bank";
 import { Pending } from "@/components/bills/shared";
 import { initials, lkr } from "@/lib/format";
 import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
@@ -116,9 +117,9 @@ function BankAccounts() {
       <SectionTitle
         action={
           verified && (
-            <TitleLink href={accountUrl({ flow: "payee", ret: "/account" })}>
+            <button className="inline-flex items-center gap-1 font-sans text-[13px] tracking-normal text-brand normal-case" onClick={openAddBank}>
               <Plus size={14} /> Add
-            </TitleLink>
+            </button>
           )
         }
       >
@@ -196,6 +197,5 @@ const Help = () => (
 export default function AccountPage() {
   const [{ flow, ret }] = useQueryStates(accountParams);
   if (flow === "verify") return <Verify ret={ret} />;
-  if (flow === "payee") return <AddPayee ret={ret} />;
   return <Overview />;
 }

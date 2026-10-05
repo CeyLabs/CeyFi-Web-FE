@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { ArrowUpDown, ChevronRight, Plus } from "lucide-react";
 import { Avatar, Button, PageHead, Pad, Panel, RiskNote, Stat, col, fine } from "../ui";
@@ -12,7 +10,7 @@ import { COPY, PNAME } from "@/lib/config";
 import { fmt, initials, lkr } from "@/lib/format";
 import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
 import { useSellForm } from "@/hooks/sell";
-import { accountUrl, tradeUrl } from "@/lib/params";
+import { openAddBank } from "@/lib/add-bank";
 
 const coin = "grid size-5 place-items-center rounded-full text-[10px] font-bold not-italic";
 export const CurUsdt = () => (
@@ -43,17 +41,15 @@ const chev = "ml-auto flex-none text-muted";
 
 /** Sell USDT: amount (in USDT or LKR), payout account and pay partner, priced live by the backend. */
 export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onReview: () => void }) {
-  const router = useRouter();
   const C = COPY.sell;
-  const addBank = accountUrl({ flow: "payee", ret: tradeUrl({ tab: "sell" }) });
-  const { amount, incur, provider, quote, q, out, bank, limits, cta, set, swap, setProvider } = useSellForm({ addBankHref: addBank });
+  const { amount, incur, provider, quote, q, out, bank, limits, cta, set, swap, setProvider } = useSellForm();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (matchMedia("(min-width:761px)").matches) input.current?.focus();
   }, []);
 
   const u = incur === "USDT";
-  const go = () => (cta.href ? router.push(cta.href) : cta.pick ? onPickBank() : onReview());
+  const go = () => (cta.addBank ? openAddBank() : cta.pick ? onPickBank() : onReview());
   const flip = () => {
     swap();
     input.current?.focus();
@@ -134,7 +130,7 @@ export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onR
                 <ChevronRight className={cn(chev, BANK_STATUS[bank.status] && "ml-0")} size={18} />
               </button>
             ) : (
-              <Link className={cn(row, "border-dashed")} href={addBank}>
+              <button className={cn(row, "border-dashed")} onClick={openAddBank}>
                 <span className={rowKey}>To</span>
                 <Avatar>
                   <Plus />
@@ -144,7 +140,7 @@ export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onR
                   <small>In your own name, at any CEFT bank in Sri Lanka</small>
                 </div>
                 <ChevronRight className={chev} size={18} />
-              </Link>
+              </button>
             )}
 
             <div className={cn(fine, "mt-4 mb-2")}>Pay with</div>

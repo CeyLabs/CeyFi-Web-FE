@@ -1,11 +1,12 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { ButtonLink, CpLogo, Empty, LRow, ListPanel, PageHead, Pad, SectionTitle, Stat, col } from "../ui";
+import { Button, CpLogo, Empty, LRow, ListPanel, PageHead, Pad, SectionTitle, Stat, col } from "../ui";
 import { Pending } from "../bills/shared";
 import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
 import { useSelectedBank } from "@/hooks/sell";
-import { accountUrl, tradeUrl } from "@/lib/params";
+import { tradeUrl } from "@/lib/params";
+import { openAddBank } from "@/lib/add-bank";
 
 /** Choose which of your bank accounts the rupees go to. */
 export function BankPicker({ onDone }: { onDone: () => void }) {
@@ -51,9 +52,9 @@ export function BankPicker({ onDone }: { onDone: () => void }) {
               )}
             </ListPanel>
             <SectionTitle>Or add new</SectionTitle>
-            <ButtonLink size="lg" href={accountUrl({ flow: "payee", self: true, ret: tradeUrl({ tab: "sell" }) })}>
+            <Button size="lg" onClick={openAddBank}>
               <Plus /> Add bank account
-            </ButtonLink>
+            </Button>
           </div>
         </Pad>
       )}
