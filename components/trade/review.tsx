@@ -1,7 +1,6 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, Checkbox, ErrorBox, Kv, PageHead, Pad, Panel, col, fine } from "../ui";
 import { cn } from "cn";
@@ -9,11 +8,11 @@ import { PNAME } from "@/lib/config";
 import { fmt, lkr } from "@/lib/format";
 import { bankLabel } from "@/lib/api/sell";
 import { useSellReview } from "@/hooks/sell";
+import { SellStatusView } from "./status";
 import { tradeUrl } from "@/lib/params";
 
-/** Confirm the sale, then create it and go to checkout. */
-export function Review({ onBack }: { onBack: () => void }) {
-  const router = useRouter();
+/** Confirm the sale, then create it and hand its id to `onPlaced` (the checkout/status screen). */
+export function Review({ onBack, onPlaced }: { onBack: () => void; onPlaced: (id: string) => void }) {
   const { quote, q, bank, provider, create, invalid, confirm } = useSellReview();
   const [agreed, setAgreed] = useState(false);
 
@@ -21,6 +20,9 @@ export function Review({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (invalid) onBack();
   }, [invalid, onBack]);
+  // Placed: show its checkout right here. `onPlaced` also moves the URL to the status step (for reloads and Back),
+  // but this screen doesn't wait on that, so it never sits blank between the two.
+  if (create.data) return <SellStatusView id={create.data.id} />;
   if (invalid || !q || !bank) return null;
 
   const via = `${PNAME[provider]} Pay`;
@@ -59,7 +61,7 @@ export function Review({ onBack }: { onBack: () => void }) {
             size="lg"
             className="mt-3.5"
             disabled={!agreed || create.isPending || quote.typing}
-            onClick={() => confirm((p) => router.replace(tradeUrl({ tab: "sell", step: "status", id: p.id })))}
+            onClick={() => confirm((p) => onPlaced(p.id))}
           >
             {create.isPending ? (
               <>

@@ -19,11 +19,13 @@ const TITLE = { sell: "Sell USDT", send: "Send money", buy: "Buy USDT" } as cons
 export default function TradePage() {
   const [{ tab, step, id }, setParams] = useQueryStates(tradeParams, { history: "push" });
   const close = useCallback(() => setParams({ step: null }), [setParams]);
+  // Through nuqs, like every other step change here: a router.replace behind its back can leave the page on Review.
+  const placed = useCallback((id: string) => setParams({ step: "status", id }, { history: "replace" }), [setParams]);
   const ret = tradeUrl({ tab: "sell" });
 
   // Sell sub-views are full screens with their own heading and back link.
   if (tab === "sell" && step)
-    return <RequireKyc ret={ret}>{step === "status" ? <SellStatusView id={id} /> : step === "review" ? <Review onBack={close} /> : <BankPicker onDone={close} />}</RequireKyc>;
+    return <RequireKyc ret={ret}>{step === "status" ? <SellStatusView id={id} /> : step === "review" ? <Review onBack={close} onPlaced={placed} /> : <BankPicker onDone={close} />}</RequireKyc>;
 
   // One heading and one tab bar for all three tabs, so the bar stays mounted and its indicator slides on every switch.
   return (
