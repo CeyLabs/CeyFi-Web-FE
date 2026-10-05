@@ -4,11 +4,10 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { I } from "@/components/icons";
 import { TxRow } from "@/components/activity";
-import { ButtonLink, Empty, FxBadge, Legal, ListPanel, PageHead, Pad, Panel, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
+import { ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, RateBadge, RateSource, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
 import { cn } from "cn";
-import { fmt } from "@/lib/format";
-import { fxDate, rateOf } from "@/lib/api/fx";
-import { useFx } from "@/hooks/fx";
+import { dShort, fmt } from "@/lib/format";
+import { useRate, useRateHistory, useUsdtRate } from "@/hooks/fx";
 import { useBanks } from "@/hooks/sell";
 import { useApp } from "@/lib/store";
 import { accountUrl, tradeUrl } from "@/lib/params";
@@ -19,15 +18,21 @@ const quickIcon = "grid size-[38px] place-items-center rounded-xl bg-brand-soft 
 export default function Home() {
   const { db } = useApp();
   const banks = useBanks();
-  const fx = useFx();
-  const u = db.user,
-    r = rateOf(fx);
-  const pts = fx.hist,
-    L = pts.length - 1;
+  const r = useRate();
+  const live = useUsdtRate().data;
+  // Daily closing rates; today's point follows the live rate.
+  const days = useRateHistory(14).data ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const before = days.filter((d) => d.date !== today);
+  const pts = [...before.map((d) => d.rate), r];
+  /** The last earlier day with a rate. History can have gaps, so it isn't always yesterday. */
+  const prev = before.at(-1)?.date;
+  const L = pts.length - 1;
   const mn = Math.min(...pts) - 0.5,
     mx = Math.max(...pts) + 0.5;
-  const path = pts.map((v, i) => `${i ? "L" : "M"}${((i / L) * 300).toFixed(1)},${(44 - ((v - mn) / (mx - mn)) * 40).toFixed(1)}`).join(" ");
-  const chg = pts[L] - pts[L - 1];
+  const path = L ? pts.map((v, i) => `${i ? "L" : "M"}${((i / L) * 300).toFixed(1)},${(44 - ((v - mn) / (mx - mn)) * 40).toFixed(1)}`).join(" ") : "";
+  const chg = L ? pts[L] - pts[L - 1] : 0;
+  const u = db.user;
 
   const steps: [string, string, boolean, string][] = [
     ["Verify your identity", "Needed to sell USDT", db.kyc === "verified", accountUrl({ flow: "verify", ret: "/" })],
@@ -41,7 +46,7 @@ export default function Home() {
         title="Home"
         right={
           <span className={cn(fine, "flex items-center gap-2 max-sm:hidden")}>
-            1 USD = <b className="font-mono font-normal text-ink">LKR {fmt(r)}</b> <FxBadge />
+            1 USDT = <b className="font-mono font-normal text-ink">LKR {fmt(r)}</b> <RateBadge />
           </span>
         }
       />
@@ -135,18 +140,22 @@ export default function Home() {
             <Panel>
               <div className="flex items-start justify-between">
                 <div>
-                  <div className={fine}>1 USD / USDT · TT buying</div>
+                  <div className={fine}>1 USDT · before fees</div>
                   <div className="font-mono text-[30px] text-ink">LKR {fmt(r)}</div>
-                  <div className={cn(fine, chg > 0 ? "text-ok" : chg < 0 ? "text-err" : "")}>
-                    {chg > 0 ? "▲" : chg < 0 ? "▼" : "•"} {fmt(Math.abs(chg))} vs previous day
-                  </div>
+                  {prev && (
+                    <div className={cn(fine, chg > 0 ? "text-ok" : chg < 0 ? "text-err" : "")}>
+                      {chg > 0 ? "▲" : chg < 0 ? "▼" : "•"} {fmt(Math.abs(chg))} vs {dShort(prev)}
+                    </div>
+                  )}
                 </div>
-                <FxBadge />
+                <RateBadge />
               </div>
-              <svg className="mt-2.5 h-[46px] w-full text-brand" viewBox="0 0 300 46" preserveAspectRatio="none" role="img" aria-label="USD to LKR over 14 days">
-                <path d={path} fill="none" stroke="currentColor" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-              </svg>
-              <p className={cn(fine, "mt-1.5")}>CeylonCash FX · as of {fxDate(fx)}</p>
+              {path && (
+                <svg className="mt-2.5 h-[46px] w-full text-brand" viewBox="0 0 300 46" preserveAspectRatio="none" role="img" aria-label="USDT to LKR over the last 14 days">
+                  <path d={path} fill="none" stroke="currentColor" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+                </svg>
+              )}
+              <p className={cn(fine, "mt-1.5")}>{live ? <RateSource /> : "CeylonCash FX · estimate"}</p>
             </Panel>
           </div>
         </div>

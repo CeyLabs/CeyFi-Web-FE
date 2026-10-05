@@ -12,7 +12,7 @@ import {
   DRow,
   ErrorBox,
   Field,
-  FxSource,
+  RateSource,
   Kv,
   PageHead,
   Pad,
@@ -199,7 +199,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
             </span>
             <span>Biller fee: free</span>
             <span className="flex items-center gap-1.5">
-              <FxSource />
+              <RateSource />
             </span>
           </div>
           <Button size="lg" className="mt-3.5" disabled={dis} onClick={go}>

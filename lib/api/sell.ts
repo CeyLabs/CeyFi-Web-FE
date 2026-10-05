@@ -45,6 +45,8 @@ export type SellBank = {
 export type AddBank = { bankCode: number; accountNumber: string; accountName: string; branch?: string };
 
 export type SellStatus = "AWAITING_PAYMENT" | "PAID" | "PAYOUT_PROCESSING" | "COMPLETED" | "EXPIRED" | "FAILED" | "PAYOUT_FAILED";
+/** The LKR bank transfer behind a paid sale. */
+export type PayoutStatus = "PENDING" | "AWAITING_APPROVAL" | "PROCESSING" | "COMPLETED" | "FAILED" | "UNKNOWN" | "REJECTED";
 export type SellPayment = {
   id: string;
   paymentNo: string;
@@ -56,7 +58,8 @@ export type SellPayment = {
   exchangeRate: string;
   provider: ProviderCode;
   bank: { id: string; bankCode: number; bankName: string | null; accountName: string; accountNumber: string };
-  payout: { status: string; reference: string | null; completedAt: string | null } | null;
+  /** `reference` is CeyPay's transfer remark (CFY…), quoted to support; not a bank reference. */
+  payout: { status: PayoutStatus; reference: string | null; completedAt: string | null } | null;
   /** Only while awaiting payment, and only on a single payment. */
   checkout?: { qrContent: string | null; checkoutLink: string | null; deepLink: string | null; expireTime: string | number | null };
   paidAt: string | null;
@@ -69,19 +72,64 @@ export type SellPayment = {
 export const sellProvider = (p: Pick<SellPayment, "provider">) => providerOf(p.provider);
 export const isFinalSell = (s: SellStatus) => s === "COMPLETED" || s === "EXPIRED" || s === "FAILED" || s === "PAYOUT_FAILED";
 
-/** The Activity state for a backend status. */
-export const sellState = (s: SellStatus): TxState =>
+/**
+ * Where a sale is, from the user's point of view. The payout status refines the in-between states:
+ * large or unusual payouts wait for an admin (`review`), failed transfers retry (`retrying`), and an
+ * ambiguous bank reply is checked by hand before anything is resent (`checking`).
+ */
+export type SellPhase = "checkout" | "sending" | "review" | "retrying" | "checking" | "sent" | "missed" | "rejected" | "payout_failed";
+export function sellPhase(p: Pick<SellPayment, "status" | "payout">): SellPhase {
+  const po = p.payout?.status;
+  switch (p.status) {
+    case "AWAITING_PAYMENT":
+      return "checkout";
+    case "EXPIRED":
+    case "FAILED":
+      return "missed";
+    case "COMPLETED":
+      return "sent";
+    case "PAYOUT_FAILED":
+      return po === "REJECTED" ? "rejected" : "payout_failed";
+  }
+  if (po === "AWAITING_APPROVAL") return "review";
+  if (po === "UNKNOWN") return "checking";
+  if (po === "FAILED") return "retrying";
+  return "sending";
+}
+
+/** What to tell the user about a sale that isn't simply moving along. */
+export function sellMessage(p: Pick<SellPayment, "status" | "payout">): string | undefined {
+  switch (sellPhase(p)) {
+    case "missed":
+      return p.status === "EXPIRED" ? "The payment window closed before any USDT arrived. You weren’t charged." : "The USDT payment didn’t go through. You weren’t charged.";
+    case "review":
+      return "We received your USDT. Our team checks larger transfers before sending them, and your rupees go out once it’s approved.";
+    case "checking":
+      return "We received your USDT. We’re confirming the transfer with the bank before doing anything else, so it’s never sent twice.";
+    case "retrying":
+      return "The bank didn’t accept the transfer on the first try. We’re retrying automatically.";
+    case "rejected":
+      return "We received your USDT but couldn’t send this transfer. Our team will contact you to refund it.";
+    case "payout_failed":
+      return "We received your USDT but the bank transfer didn’t go through. Our team has been alerted and will retry or refund you.";
+  }
+}
+
+/** The Activity state for a sale. */
+export const sellState = (p: Pick<SellPayment, "status" | "payout">): TxState =>
   (
     ({
-      AWAITING_PAYMENT: "charging",
-      PAID: "converting",
-      PAYOUT_PROCESSING: "paying_out",
-      COMPLETED: "completed",
-      EXPIRED: "charge_failed",
-      FAILED: "charge_failed",
-      PAYOUT_FAILED: "payout_failed",
+      checkout: "charging",
+      sending: p.status === "PAID" && !p.payout ? "converting" : "paying_out",
+      retrying: "paying_out",
+      review: "in_review",
+      checking: "in_review",
+      sent: "completed",
+      missed: "charge_failed",
+      rejected: "payout_failed",
+      payout_failed: "payout_failed",
     }) as const
-  )[s];
+  )[sellPhase(p)];
 
 /** Badge for a bank account that can't be paid out to yet; null when it can. */
 export const BANK_STATUS: Record<BankStatus, { label: string; tone: string } | null> = {

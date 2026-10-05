@@ -61,7 +61,8 @@ export function TxRow({ db, t, selected, compact, q }: { db: DB; t: Tx; selected
 
 function Timeline({ db, t }: { db: DB; t: Tx }) {
   const O = ["charging", "converting", "paying_out", "completed"];
-  const i = O.indexOf(t.state);
+  // In review sits on the payout step.
+  const i = O.indexOf(t.state === "in_review" ? "paying_out" : t.state);
   const fi = ({ charge_failed: 0, rate_changed: 1, refund_requested: 1, payout_failed: 2 } as Record<string, number>)[t.state] ?? -1;
   const N: [string, string][] = [
     ["USDT collected", `${fmt(t.usdt)} USDT from ${txVia(db, t)}`],
@@ -124,7 +125,7 @@ export function TxDetail({ t }: { t: Tx }) {
           <Timeline db={db} t={t} />
         </DCard>
       )}
-      {t.message && !live && t.state !== "completed" && <Alert>{t.message}</Alert>}
+      {t.message && t.state !== "completed" && (!live || t.kind === "sell") && <Alert tone={live ? "warn" : "err"}>{t.message}</Alert>}
       {t.payment_id && t.state === "charging" ? (
         <ButtonLink
           size="lg"
@@ -214,13 +215,18 @@ export function TxDetail({ t }: { t: Tx }) {
             <span className="font-mono">{t.bank_ref}</span>
           </DRow>
         )}
+        {t.transfer_ref && (
+          <DRow label="Transfer ref">
+            <span className="font-mono">{t.transfer_ref}</span>
+          </DRow>
+        )}
         {t.biller_ref && (
           <DRow label="Biller ref">
             <span className="font-mono">{t.biller_ref}</span>
           </DRow>
         )}
         <DRow label="CeyPay ref">
-          <span className="font-mono">{t.id}</span>
+          <span className="font-mono">{t.ref || t.id}</span>
         </DRow>
       </DCard>
       {rec && (

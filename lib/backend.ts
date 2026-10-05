@@ -81,6 +81,8 @@ export type TxState =
   | "rate_changed"
   | "refund_requested"
   | "payout_failed"
+  /** Waiting on a person: a large payout awaiting approval, or a bank reply being checked. */
+  | "in_review"
   | "charge_failed"
   | "failed";
 export type Tx = {
@@ -107,6 +109,9 @@ export type Tx = {
   purpose?: string;
   payee?: { name: string; nickname?: string; bank: string; account: string; self?: boolean; relationship?: string };
   bank_ref?: string;
+  /** Sells: CeyPay's reference for the bank transfer (CFY…), and the sale's payment number. */
+  transfer_ref?: string;
+  ref?: string;
   message?: string;
   /** Bill payments: the server payment this mirrors. Its state comes from the backend, not the demo engine. */
   payment_id?: string;
@@ -118,7 +123,7 @@ export type Tx = {
   _p0?: number;
 };
 
-export const LIVE: TxState[] = ["charging", "converting", "paying_out", "processing"];
+export const LIVE: TxState[] = ["charging", "converting", "paying_out", "processing", "in_review"];
 export const isLive = (s: TxState) => LIVE.includes(s);
 export const stLabel = (s: string) =>
   (
@@ -131,6 +136,7 @@ export const stLabel = (s: string) =>
       rate_changed: "Needs your OK",
       refund_requested: "Refund requested",
       payout_failed: "Payout failed",
+      in_review: "In review",
       charge_failed: "Failed",
       failed: "Failed",
     }) as Record<string, string>

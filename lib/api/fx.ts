@@ -2,7 +2,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { CFG } from "../config";
 import { dLong } from "../format";
 
-/* FX rates from fx.ceyloncash.com, with a bundled snapshot when the live feed can't be reached. */
+/* The CeylonCash FX board (all currencies, for the Rates page), with a bundled snapshot when the feed can't be reached.
+   The USDT→LKR rate used for pricing comes from the backend instead (see rates.ts). */
 
 export const FX_BASE = "https://fx.ceyloncash.com";
 const FX_FIELD = "telegraphic_transfers_buying_rate";
@@ -33,12 +34,9 @@ const SNAPSHOT = {
   _meta: { as_of: "20260925", age_days: 0, stale: false },
 } as unknown as FxData;
 
-/** USD TT buying rate over the last 14 days; the last point follows the live feed. */
-const HIST = [324.5, 324.5, 324.5, 325.25, 328, 328, 326, 326, 326, 327, 325.5, 325, 326.5, 326.25];
-
-export type Fx = { data: FxData; source: "live" | "snapshot"; hist: number[] };
+export type Fx = { data: FxData; source: "live" | "snapshot" };
 /** Shown until the live feed answers, and kept when it can't be reached. */
-export const SNAPSHOT_FX: Fx = { data: SNAPSHOT, source: "snapshot", hist: HIST };
+export const SNAPSHOT_FX: Fx = { data: SNAPSHOT, source: "snapshot" };
 
 export const fxQuery = () =>
   queryOptions({
@@ -50,7 +48,7 @@ export const fxQuery = () =>
       const d = (await r.json()) as FxData;
       const usd = d?.USD?.[FX_FIELD];
       if (!usd) throw new Error("No USD rate");
-      return { data: d, source: "live", hist: [...HIST.slice(0, -1), usd] };
+      return { data: d, source: "live" };
     },
     staleTime: 5 * 60e3,
     refetchInterval: 5 * 60e3,

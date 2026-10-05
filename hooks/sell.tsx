@@ -13,6 +13,7 @@ import {
   sellKeys,
   sellPaymentQuery,
   sellProvider,
+  sellMessage,
   sellQuoteQuery,
   sellState,
   setDefaultBank,
@@ -239,11 +240,6 @@ function useMirror(list: SellPayment[] | undefined) {
   }, [list]);
 }
 
-const FAIL_MESSAGE: Partial<Record<SellPayment["status"], string>> = {
-  EXPIRED: "The payment window closed before any USDT arrived. You weren’t charged.",
-  FAILED: "The USDT payment didn’t go through. You weren’t charged.",
-  PAYOUT_FAILED: "We received your USDT but the bank transfer didn’t go through. Our team has been alerted and will retry or refund you.",
-};
 
 /** The Activity entry for a sale, created or updated from the server. */
 function upsertSellTx(db: DB, p: SellPayment) {
@@ -252,7 +248,7 @@ function upsertSellTx(db: DB, p: SellPayment) {
     id: p.id,
     payment_id: p.id,
     kind: "sell",
-    state: sellState(p.status),
+    state: sellState(p),
     created: Date.parse(p.createdAt),
     cp: { kind: "sell", name: "Sold USDT", key: "sell" },
     method_id: "",
@@ -262,8 +258,9 @@ function upsertSellTx(db: DB, p: SellPayment) {
     quoted_lkr: lkr,
     lkr: p.status === "COMPLETED" ? lkr : undefined,
     payee: { name: p.bank.accountName, bank: p.bank.bankName ?? "Bank", account: p.bank.accountNumber, self: true },
-    bank_ref: p.payout?.reference ?? undefined,
-    message: FAIL_MESSAGE[p.status],
+    transfer_ref: p.payout?.reference ?? undefined,
+    ref: p.paymentNo || undefined,
+    message: sellMessage(p),
   };
   const t = db.tx.find((x) => x.id === p.id);
   if (!t) {

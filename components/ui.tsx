@@ -9,9 +9,8 @@ import { createContext, useContext, useEffect, useState, type ComponentProps, ty
 import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search } from "lucide-react";
 import { cn } from "cn";
 import { CFG, PNAME } from "@/lib/config";
-import { fmt, hue, initials, phone } from "@/lib/format";
-import { fxDate } from "@/lib/api/fx";
-import { useFx } from "@/hooks/fx";
+import { dTime, fmt, hue, initials, phone } from "@/lib/format";
+import { useFx, useUsdtRate } from "@/hooks/fx";
 import { isExpired, spentBy, type Counterparty, type DB, type Method } from "@/lib/backend";
 import { infoUrl } from "@/lib/params";
 import { openSignIn } from "@/lib/auth";
@@ -272,6 +271,7 @@ const STAT: Record<string, string> = {
   paused: "bg-warn-soft text-warn",
   charge_failed: "bg-err-soft text-err",
   payout_failed: "bg-err-soft text-err",
+  in_review: "bg-warn-soft text-warn",
   failed: "bg-err-soft text-err",
 };
 
@@ -296,11 +296,25 @@ export function FxBadge() {
   );
 }
 
-export function FxSource() {
-  const fx = useFx();
+const RATE_SOURCE: Record<string, string> = { CEYLON_CASH_FX: "CeylonCash FX", BINANCE_API: "Binance", COINGECKO_API: "CoinGecko", MANUAL: "Set by CeyPay" };
+
+/** Live / Estimate marker for CeyPay's USDT→LKR rate. */
+export function RateBadge() {
+  const { data } = useUsdtRate();
+  if (data) return <Stat>Live</Stat>;
+  return (
+    <Stat tone="charging" title="CeyPay’s rate couldn’t be loaded, so the FX board’s USD rate is shown as an estimate">
+      Estimate
+    </Stat>
+  );
+}
+
+/** Where CeyPay's USDT→LKR rate comes from and when it was last set. */
+export function RateSource() {
+  const { data } = useUsdtRate();
   return (
     <>
-      CeylonCash FX · {fxDate(fx)} <FxBadge />
+      {data ? `${RATE_SOURCE[data.rateSource] ?? data.rateSource} · ${dTime(data.rateTimestamp)}` : "CeylonCash FX"} <RateBadge />
     </>
   );
 }
