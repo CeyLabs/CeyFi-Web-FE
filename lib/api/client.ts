@@ -27,18 +27,21 @@ async function errorOf(res: Response) {
 
 type Init = Omit<RequestInit, "body"> & {
   body?: unknown;
-  /** Send the Privy session: the access token authenticates, the identity token fills email/phone on the backend profile. */
-  auth?: boolean;
+  /**
+   * Send the Privy access token, which authenticates the user. `"identity"` also sends the identity token, which the
+   * backend only uses to fill email/phone on the profile; fetching it can cost a Privy round trip, so only the sign-in sync asks for it.
+   */
+  auth?: boolean | "identity";
 };
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const [access, identity] = await Promise.all([getAccessToken(), getIdentityToken()]);
+async function authHeaders(withIdentity: boolean): Promise<Record<string, string>> {
+  const [access, identity] = await Promise.all([getAccessToken(), withIdentity ? getIdentityToken() : null]);
   if (!access) throw new ApiError(401, "Sign in to continue.");
   return { Authorization: `Bearer ${access}`, ...(identity && { "privy-id-token": identity }) };
 }
 
 export async function api<T>(path: string, { auth, ...init }: Init = {}): Promise<T> {
-  const extra = auth ? await authHeaders() : {};
+  const extra = auth ? await authHeaders(auth === "identity") : {};
   let res: Response;
   try {
     res = await fetch(API_URL + path, {

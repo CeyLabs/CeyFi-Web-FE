@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { Button, CpLogo, Empty, LRow, ListPanel, PageHead, Pad, SectionTitle, Stat, col } from "../ui";
 import { Pending } from "../bills/shared";
+import { cn } from "cn";
 import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
 import { useSelectedBank } from "@/hooks/sell";
 import { tradeUrl } from "@/lib/params";
@@ -19,7 +20,7 @@ export function BankPicker({ onDone }: { onDone: () => void }) {
         <Pending error={error} onRetry={() => refetch()} label="Loading your bank accounts" />
       ) : (
         <Pad>
-          <div className={col}>
+          <div className={cn(col, "mx-auto")}>
             <ListPanel>
               {data.length ? (
                 data.map((b) => {

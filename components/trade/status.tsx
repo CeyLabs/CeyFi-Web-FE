@@ -69,7 +69,7 @@ export function SellStatusView({ id }: { id: string | null }) {
       <>
         <PageHead title="Finish paying" back={back} backAlways />
         <Pad>
-          <div className={col}>
+          <div className={cn(col, "mx-auto")}>
             <CheckoutPanel checkout={p.checkout} via={via} amount={`${fmt(Number(p.usdtAmount))} USDT`} sub={`for ${lkr(Number(p.lkrPayoutAmount))} to your bank`}>
               <Rows p={p} via={via} />
             </CheckoutPanel>
@@ -85,7 +85,7 @@ export function SellStatusView({ id }: { id: string | null }) {
     <>
       <PageHead title={v.title} back={back} backAlways />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <Panel className="text-center">
             {v.icon}
             <div className="mt-2 font-mono text-[28px] tracking-[-.5px] text-ink">{lkr(Number(p.lkrPayoutAmount))}</div>

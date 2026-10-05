@@ -21,8 +21,22 @@ const KYC_COPY: Record<Exclude<Kyc, "verified">, { tag?: string; title: string; 
   failed: { tag: "Didn’t pass", title: "Let’s try that again", sub: "Make sure your ID is valid and fully in frame, with your face clearly visible.", cta: "Try again" },
 };
 
-/** Identity verification prompt. The button goes straight to Didit (resuming an open session), and comes back to `ret`. */
+/** Identity verification prompt, as its own page. */
 export function KycStart({ ret }: { ret: string }) {
+  return (
+    <>
+      <PageHead title="Verify your identity" />
+      <Pad>
+        <div className={cn(col, "mx-auto")}>
+          <KycPrompt ret={ret} />
+        </div>
+      </Pad>
+    </>
+  );
+}
+
+/** Identity verification prompt (body only). The button goes straight to Didit (resuming an open session), and comes back to `ret`. */
+export function KycPrompt({ ret }: { ret: string }) {
   const { db } = useApp();
   useKyc();
   const start = useStartKyc(ret);
@@ -32,55 +46,50 @@ export function KycStart({ ret }: { ret: string }) {
 
   return (
     <>
-      <PageHead title="Verify your identity" />
-      <Pad>
-        <div className={cn(col, "mx-auto")}>
-          <Panel className="relative overflow-hidden p-6 text-center md:p-8">
-            <div className="pointer-events-none absolute inset-0 [background:var(--glow)]" />
-            <div className="relative">
-              <span className="mx-auto grid size-16 place-items-center rounded-[20px] bg-brand-soft text-brand">
-                <ShieldCheck size={30} strokeWidth={1.75} />
-              </span>
-              {c.tag && (
-                <span
-                  className={cn(
-                    "mt-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11.5px]",
-                    db.kyc === "failed" ? "bg-err-soft text-err" : "bg-warn-soft text-warn",
-                  )}
-                >
-                  <span className={cn("size-1.5 rounded-full bg-current", db.kyc === "pending" && "animate-pulse")} />
-                  {c.tag}
-                </span>
+      <Panel className="relative overflow-hidden p-6 text-center md:p-8">
+        <div className="pointer-events-none absolute inset-0 [background:var(--glow)]" />
+        <div className="relative">
+          <span className="mx-auto grid size-16 place-items-center rounded-[20px] bg-brand-soft text-brand">
+            <ShieldCheck size={30} strokeWidth={1.75} />
+          </span>
+          {c.tag && (
+            <span
+              className={cn(
+                "mt-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11.5px]",
+                db.kyc === "failed" ? "bg-err-soft text-err" : "bg-warn-soft text-warn",
               )}
-              <h2 className="mt-4 text-[22px] font-medium tracking-[-.4px] text-ink">{c.title}</h2>
-              <p className="mx-auto mt-1.5 max-w-[360px] text-[14.5px] text-muted">{c.sub}</p>
-            </div>
-          </Panel>
-
-          {db.kyc !== "pending" && (
-            <Panel className="py-1.5">
-              {KYC_STEPS.map(({ icon: Icon, title, sub }) => (
-                <div key={title} className="flex items-center gap-3 border-line-subtle py-3 [&+&]:border-t">
-                  <span className="grid size-10 flex-none place-items-center rounded-xl bg-glass text-fg shadow-[inset_0_0_0_1px_var(--line-subtle)]">
-                    <Icon size={19} strokeWidth={1.75} />
-                  </span>
-                  <div>
-                    <b className="block text-[14.5px] font-medium text-ink">{title}</b>
-                    <span className="text-[12.5px] text-muted">{sub}</span>
-                  </div>
-                </div>
-              ))}
-            </Panel>
+            >
+              <span className={cn("size-1.5 rounded-full bg-current", db.kyc === "pending" && "animate-pulse")} />
+              {c.tag}
+            </span>
           )}
-
-          <Button size="lg" className="mt-4 w-full" disabled={busy} onClick={() => start.mutate()}>
-            {busy ? "Opening Didit…" : c.cta}
-          </Button>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-[12px] text-muted">
-            <Lock size={12} /> Secured by Didit. Used only to meet legal requirements.
-          </p>
+          <h2 className="mt-4 text-[22px] font-medium tracking-[-.4px] text-ink">{c.title}</h2>
+          <p className="mx-auto mt-1.5 max-w-[360px] text-[14.5px] text-muted">{c.sub}</p>
         </div>
-      </Pad>
+      </Panel>
+
+      {db.kyc !== "pending" && (
+        <Panel className="py-1.5">
+          {KYC_STEPS.map(({ icon: Icon, title, sub }) => (
+            <div key={title} className="flex items-center gap-3 border-line-subtle py-3 [&+&]:border-t">
+              <span className="grid size-10 flex-none place-items-center rounded-xl bg-glass text-fg shadow-[inset_0_0_0_1px_var(--line-subtle)]">
+                <Icon size={19} strokeWidth={1.75} />
+              </span>
+              <div>
+                <b className="block text-[14.5px] font-medium text-ink">{title}</b>
+                <span className="text-[12.5px] text-muted">{sub}</span>
+              </div>
+            </div>
+          ))}
+        </Panel>
+      )}
+
+      <Button size="lg" className="mt-4 w-full" disabled={busy} onClick={() => start.mutate()}>
+        {busy ? "Opening Didit…" : c.cta}
+      </Button>
+      <p className="mt-3 flex items-center justify-center gap-1.5 text-[12px] text-muted">
+        <Lock size={12} /> Secured by Didit. Used only to meet legal requirements.
+      </p>
     </>
   );
 }

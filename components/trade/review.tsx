@@ -29,7 +29,7 @@ export function Review({ onBack }: { onBack: () => void }) {
     <>
       <PageHead title="Review sale" back={tradeUrl({ tab: "sell" })} />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <Panel className="text-center">
             <div className={fine}>You receive</div>
             <div className={cn("font-mono text-4xl font-medium tracking-[-1px] text-ink", quote.isFetching && "opacity-60")}>{lkr(Number(q.lkrPayoutAmount))}</div>

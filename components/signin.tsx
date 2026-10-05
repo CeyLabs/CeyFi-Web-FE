@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { KycStart } from "@/components/account/flows";
+import { KycPrompt, KycStart } from "@/components/account/flows";
 import { Button, Empty, PageHead, Pad, Panel, col } from "@/components/ui";
 import { cn } from "cn";
 import { usePrivySession } from "@/hooks/auth";
@@ -37,8 +37,9 @@ export function RequireAuth({ title, children }: { title: string; children: Reac
   );
 }
 
-/** Stands in for a screen the backend only allows after identity verification. Use inside RequireAuth. */
-export function RequireKyc({ ret, children }: { ret: string; children: ReactNode }) {
+/** Stands in for a screen the backend only allows after identity verification. Use inside RequireAuth. `bare` renders just the prompt, for a page that draws its own heading. */
+export function RequireKyc({ ret, bare, children }: { ret: string; bare?: boolean; children: ReactNode }) {
   const { db } = useApp();
-  return db.kyc === "verified" ? <>{children}</> : <KycStart ret={ret} />;
+  if (db.kyc === "verified") return <>{children}</>;
+  return bare ? <KycPrompt ret={ret} /> : <KycStart ret={ret} />;
 }

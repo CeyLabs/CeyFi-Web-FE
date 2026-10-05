@@ -2,34 +2,50 @@
 
 import { useQueryStates } from "nuqs";
 import { useCallback } from "react";
+import { PageHead, Pad, col } from "@/components/ui";
 import { RequireKyc } from "@/components/signin";
-import { ComingSoon } from "@/components/soon";
+import { ComingSoonBody } from "@/components/soon";
 import { Composer } from "@/components/trade/composer";
 import { BankPicker } from "@/components/trade/pickers";
 import { Review } from "@/components/trade/review";
 import { SellStatusView } from "@/components/trade/status";
 import { TradeTabs } from "@/components/trade/tabs";
+import { cn } from "cn";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
-/** Sell, Send and Buy on one route: `?tab=sell|send|buy` picks the flow, `?step=` the sub-view. Only Sell is live. */
+const TITLE = { sell: "Sell USDT", send: "Send money", buy: "Buy USDT" } as const;
+
+/** Sell, Send and Buy on one route: `?tab=sell|send|buy` picks the flow, `?step=` a Sell sub-view. Only Sell is live. */
 export default function TradePage() {
   const [{ tab, step, id }, setParams] = useQueryStates(tradeParams, { history: "push" });
   const close = useCallback(() => setParams({ step: null }), [setParams]);
+  const ret = tradeUrl({ tab: "sell" });
 
-  if (tab === "send") return <ComingSoon title="Send money" what="Sending money" top={<TradeTabs tab="send" />} />;
-  if (tab === "buy") return <ComingSoon title="Buy USDT" what="Buying USDT" top={<TradeTabs tab="buy" />} />;
-  // The backend only pays out to verified users, so selling starts with identity verification.
+  // Sell sub-views are full screens with their own heading and back link.
+  if (tab === "sell" && step)
+    return <RequireKyc ret={ret}>{step === "status" ? <SellStatusView id={id} /> : step === "review" ? <Review onBack={close} /> : <BankPicker onDone={close} />}</RequireKyc>;
+
+  // One heading and one tab bar for all three tabs, so the bar stays mounted and its indicator slides on every switch.
   return (
-    <RequireKyc ret={tradeUrl({ tab })}>
-      {step === "status" ? (
-        <SellStatusView id={id} />
-      ) : step === "review" ? (
-        <Review onBack={close} />
-      ) : step === "payee" ? (
-        <BankPicker onDone={close} />
-      ) : (
-        <Composer onPickBank={() => setParams({ step: "payee" })} onReview={() => setParams({ step: "review" })} />
-      )}
-    </RequireKyc>
+    <>
+      <PageHead title={TITLE[tab]} />
+      <Pad>
+        <div className={cn(col, "mx-auto")}>
+          <TradeTabs tab={tab} />
+          <div key={tab} className="animate-view-in">
+            {tab === "send" ? (
+              <ComingSoonBody what="Sending money" />
+            ) : tab === "buy" ? (
+              <ComingSoonBody what="Buying USDT" />
+            ) : (
+              // The backend only pays out to verified users, so selling starts with identity verification.
+              <RequireKyc ret={ret} bare>
+                <Composer onPickBank={() => setParams({ step: "payee" })} onReview={() => setParams({ step: "review" })} />
+              </RequireKyc>
+            )}
+          </div>
+        </div>
+      </Pad>
+    </>
   );
 }
