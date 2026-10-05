@@ -1,3 +1,5 @@
+import { getAccessToken, getIdentityToken } from "@privy-io/react-auth";
+
 /* Thin fetch wrapper for the CeyPay backend. */
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
@@ -23,13 +25,26 @@ async function errorOf(res: Response) {
   return new ApiError(res.status, res.status >= 500 ? "Something went wrong on our side. Try again in a moment." : `Request failed (${res.status})`);
 }
 
-export async function api<T>(path: string, init?: Omit<RequestInit, "body"> & { body?: unknown }): Promise<T> {
+type Init = Omit<RequestInit, "body"> & {
+  body?: unknown;
+  /** Send the Privy session: the access token authenticates, the identity token fills email/phone on the backend profile. */
+  auth?: boolean;
+};
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const [access, identity] = await Promise.all([getAccessToken(), getIdentityToken()]);
+  if (!access) throw new ApiError(401, "Sign in to continue.");
+  return { Authorization: `Bearer ${access}`, ...(identity && { "privy-id-token": identity }) };
+}
+
+export async function api<T>(path: string, { auth, ...init }: Init = {}): Promise<T> {
+  const extra = auth ? await authHeaders() : {};
   let res: Response;
   try {
     res = await fetch(API_URL + path, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-      body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+      headers: { "Content-Type": "application/json", ...extra, ...init.headers },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {
     throw new ApiError(0, "Can’t reach CeyPay. Check your connection and try again.");

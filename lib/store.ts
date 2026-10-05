@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { Tab } from "./config";
-import { eligible, defaultFor, type DB, type ExchangeMethod, type Payee, type Quote, type User } from "./backend";
+import { eligible, defaultFor, type DB, type ExchangeMethod, type Payee, type Quote } from "./backend";
 
 /* Client-side state persisted to localStorage (stand-in for the backend). */
 
@@ -72,16 +72,11 @@ export function patchDraft(p: Partial<Draft>) {
   Object.assign(state.draft, p);
 }
 
-/** Returning users of the demo sign-in, keyed by phone or email. */
-export const knownUser = {
-  get: (id: string) => ls.get<Omit<User, "providers" | "since"> | null>("known_" + id, null),
-  set: (id: string, u: Omit<User, "providers" | "since">) => ls.set("known_" + id, u),
-};
+/** The signed-in user, readable outside React, e.g. in event handlers. */
+export const currentUser = () => (load(), state.db.user);
+export const signedIn = () => !!currentUser();
 
-/** True once a user has signed in. Readable outside React, e.g. in event handlers. */
-export const signedIn = () => (load(), !!state.db.user);
-
-/** Sign out and clear that user's data, so a signed-out visitor never sees it. Returning users stay known. */
+/** Clear the signed-in user's data, so a signed-out visitor never sees it. Ending the Privy session is the caller's job. */
 export function signOut() {
   state.db = emptyDb();
   state.draft = emptyDraft();

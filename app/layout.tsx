@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Suspense } from "react";
 import { Frame, Toast } from "@/components/shell";
-import { SignInDialog } from "@/components/signin";
+import { PrivyAuth } from "@/components/signin";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -39,7 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Suspense>
               <Frame>{children}</Frame>
             </Suspense>
-            <SignInDialog />
+            <PrivyAuth />
             <Toast />
           </NuqsAdapter>
         </Providers>

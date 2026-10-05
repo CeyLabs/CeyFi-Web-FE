@@ -1,6 +1,5 @@
 /* =====================================================================
-   Mock backend. The in-browser DB stands in for Clerk (auth), Pay&Go
-   (cards), LankaClear JustPay (bank debits) and CeyPay Direct
+   Mock backend. The in-browser DB stands in for Pay&Go (cards), LankaClear JustPay (bank debits) and CeyPay Direct
    Debit + Offramp (exchanges → LKR). Replace these with API calls to go live.
    ===================================================================== */
 import { CFG, PNAME, bankShort, type Provider } from "./config";
@@ -8,9 +7,9 @@ import type { Biller } from "./api/bills";
 import { mask, uid } from "./format";
 import { rate } from "./fx";
 
-export type Kyc = "not_started" | "verified";
-export type SignInVia = "google" | "apple" | "binance" | "phone" | "email";
-export type User = { name: string; email: string; phone: string; via: SignInVia; providers: SignInVia[]; since: number };
+export type Kyc = "not_started" | "pending" | "failed" | "verified";
+/** The signed-in user, mirrored from the backend (`/ceyfi/user/me`) and Privy. */
+export type User = { id: string; privyId: string; name: string; email: string; phone: string; since: number };
 
 /* ---------- payment methods ---------- */
 
@@ -370,7 +369,6 @@ export function seed(db: DB) {
   const e2: ExchangeMethod = { id: uid("pm_"), type: "exchange", provider: "bybit", label: "Trading", per_txn_limit: 300, monthly_limit: 1000, created: now - 40 * D };
   db.methods = [e1, j1, c1, c2, e2];
   db.defaultId = j1.id;
-  db.kyc = "verified";
 
   const own: Payee = { id: uid("pay_"), is_self: true, bank_code: 7278, bank_name: "Sampath Bank PLC", account_number: "123456789012", account_name: name, nickname: "My Sampath", relationship: "Self", mobile: null };
   const amma: Payee = { id: uid("pay_"), is_self: false, bank_code: 7010, bank_name: "Bank of Ceylon", account_number: "8800112233", account_name: "K A Perera", nickname: "Amma", relationship: "Parent", mobile: "0771112233" };

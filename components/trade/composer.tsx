@@ -89,10 +89,6 @@ export function Composer({ tab, onPickPayee, onReview }: { tab: Tab; onPickPayee
   } else if (q.gross_usdt < CFG.min_usdt) {
     label = `The minimum is ${CFG.min_usdt} USDT`;
     dis = true;
-  } else if (db.kyc !== "verified") {
-    label = "Verify your identity";
-    href = accountUrl({ flow: "verify", ret });
-    step = "Required by law, once, before your first transfer";
   } else if (!acc) {
     label = "Link an exchange account";
     href = addMethodUrl("exchange", ret);

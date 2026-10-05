@@ -14,6 +14,7 @@ import { loadFx } from "@/lib/fx";
 import { isExpired } from "@/lib/backend";
 import { onToast } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
+import { RequireAuth } from "@/components/signin";
 import { BillTxSync } from "@/hooks/bills";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
@@ -139,9 +140,14 @@ function View({ children }: { children: ReactNode }) {
   );
 }
 
-/** App frame. Waits for localStorage state, then wraps every screen in the sidebar shell, signed in or not. */
+/** App frame. Waits for localStorage state, then wraps every screen in the sidebar shell. Non-public screens ask for sign-in. */
+/** Pages anyone can use without an account. Every other page asks for sign-in. */
+const PUBLIC = ["bills", "rates", "info"];
+const TITLES: Record<string, string> = { "": "Home", activity: "Activity", wallet: "Wallet", trade: "Move money", recurring: "Recurring payments", account: "Account" };
+
 export function Frame({ children }: { children: ReactNode }) {
   const { ready } = useApp();
+  const seg = usePathname().split("/")[1];
 
   useEffect(() => {
     loadFx();
@@ -154,7 +160,7 @@ export function Frame({ children }: { children: ReactNode }) {
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[76px_minmax(0,1fr)] lg:grid-cols-[252px_minmax(0,1fr)]">
         <Sidebar />
         <main className="min-w-0 pb-[calc(76px+env(safe-area-inset-bottom))] md:pb-0" aria-live="polite">
-          <View>{children}</View>
+          <View>{PUBLIC.includes(seg) ? children : <RequireAuth title={TITLES[seg] ?? "CeyPay"}>{children}</RequireAuth>}</View>
         </main>
       </div>
       <BottomNav />
