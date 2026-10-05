@@ -34,15 +34,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <Providers>
-          <NuqsAdapter>
-            <Suspense>
-              <Frame>{children}</Frame>
-            </Suspense>
-            <PrivyAuth />
-            <Toast />
-          </NuqsAdapter>
-        </Providers>
+        {/* Base UI popups portal outside this root; isolating it keeps them above any z-index inside. */}
+        <div className="isolate">
+          <Providers>
+            <NuqsAdapter>
+              <Suspense>
+                <Frame>{children}</Frame>
+              </Suspense>
+              <PrivyAuth />
+              <Toast />
+            </NuqsAdapter>
+          </Providers>
+        </div>
       </body>
     </html>
   );

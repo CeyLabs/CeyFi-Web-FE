@@ -1,9 +1,11 @@
 "use client";
 
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { ReactNode } from "react";
-import { Panel, fine, tile, tileOn, useNow } from "./ui";
+import { Panel, fine, tile, useNow } from "./ui";
 import { cn } from "cn";
 import { PNAME, type Provider } from "@/lib/config";
 import { checkoutQr, expiresAt } from "@/lib/api/bills";
@@ -14,26 +16,27 @@ export const PROVIDERS: Provider[] = ["binance", "bybit", "kucoin"];
 /** Logos copied from CeyPay-FE. `-dark` has white lettering for the dark theme. */
 const PM_LOGO: Record<Provider, string> = { binance: "/pay-methods/binance-pay", bybit: "/pay-methods/bybit-pay", kucoin: "/pay-methods/kucoin-pay" };
 
-/** Binance / Bybit / KuCoin Pay tiles. */
+/** Binance / Bybit / KuCoin Pay tiles (Base UI RadioGroup: arrow keys move between them). */
 export function ProviderPicker({ value, onChange }: { value: Provider; onChange: (p: Provider) => void }) {
   return (
-    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pay with">
+    <RadioGroup value={value} onValueChange={(v) => onChange(v as Provider)} aria-label="Pay with" className="grid grid-cols-3 gap-2">
       {PROVIDERS.map((k) => (
-        <button
+        <Radio.Root
           key={k}
-          role="radio"
-          aria-checked={k === value}
+          value={k}
           aria-label={`${PNAME[k]} Pay`}
-          className={cn(tile, "h-16 items-center justify-center p-3", k === value && tileOn)}
-          onClick={() => onChange(k)}
+          className={cn(
+            tile,
+            "h-16 cursor-pointer items-center justify-center p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand data-checked:border-brand data-checked:bg-brand-soft",
+          )}
         >
           {/* eslint-disable @next/next/no-img-element -- static SVG logos; next/image adds nothing here */}
           <img src={`${PM_LOGO[k]}-dark.svg`} alt="" className="on-dark h-5 w-full object-contain" />
           <img src={`${PM_LOGO[k]}.svg`} alt="" className="on-light h-5 w-full object-contain" />
           {/* eslint-enable @next/next/no-img-element */}
-        </button>
+        </Radio.Root>
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 

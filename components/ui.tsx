@@ -1,5 +1,8 @@
 "use client";
 
+import { Checkbox as BaseCheckbox } from "@base-ui/react/checkbox";
+import { Dialog } from "@base-ui/react/dialog";
+import { Switch } from "@base-ui/react/switch";
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
@@ -107,9 +110,10 @@ export function SearchBox({ value, onChange, label }: { value: string; onChange:
 }
 
 /** Segmented switch of plain links, so tabs work with middle-click and history. */
-export function Segmented({ items, className }: { items: { href: string; label: ReactNode; on: boolean; replace?: boolean }[]; className?: string }) {
+/** Segmented links between sibling pages (navigation, not tabs: each item is its own route). For views within one screen, use Base UI Tabs. */
+export function Segmented({ items, label, className }: { items: { href: string; label: ReactNode; on: boolean; replace?: boolean }[]; label: string; className?: string }) {
   return (
-    <div className={cn("mb-3 grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl border border-line bg-field p-[3px]", className)} role="tablist">
+    <nav className={cn("mb-3 grid auto-cols-fr grid-flow-col gap-0.5 rounded-xl border border-line bg-field p-[3px]", className)} aria-label={label}>
       {items.map((t) => (
         <Link
           key={t.href}
@@ -121,27 +125,27 @@ export function Segmented({ items, className }: { items: { href: string; label: 
           {t.label}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }
 
-/** Bottom sheet on phones, centred dialog on wider screens. Escape or a tap outside closes it. */
+/** Bottom sheet on phones, centred dialog on wider screens (Base UI Dialog: focus trap, Escape and outside click close it). */
 export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
-  useEffect(() => {
-    if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    addEventListener("keydown", k);
-    return () => removeEventListener("keydown", k);
-  }, [open, onClose]);
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center md:p-6" role="dialog" aria-modal="true" aria-label={label}>
-      <button className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-label="Close" onClick={onClose} />
-      <div className="relative w-full max-w-[460px] animate-view-in rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] md:rounded-[22px] md:pb-[18px]">
-        <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-line md:hidden" />
-        {children}
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 min-h-dvh bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
+        <Dialog.Viewport className="fixed inset-0 flex items-end justify-center md:items-center md:p-6">
+          <Dialog.Popup
+            aria-label={label}
+            className="relative w-full max-w-[460px] rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] outline-none transition-[translate,opacity,scale] duration-200 ease-out data-ending-style:translate-y-6 data-ending-style:opacity-0 data-starting-style:translate-y-6 data-starting-style:opacity-0 md:rounded-[22px] md:pb-[18px] md:data-ending-style:translate-y-0 md:data-ending-style:scale-[0.98] md:data-starting-style:translate-y-0 md:data-starting-style:scale-[0.98]"
+          >
+            <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-line md:hidden" />
+            {children}
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -701,19 +705,18 @@ export function Alert({ children, action, tone = "err", className }: { children:
   );
 }
 
+/** On/off switch (Base UI Switch). */
 export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: () => void; disabled?: boolean; label: string }) {
   return (
-    <button
-      className={cn(
-        "relative h-6 w-10 flex-none rounded-full bg-line disabled:opacity-50",
-        "after:absolute after:top-[3px] after:left-[3px] after:size-[18px] after:rounded-full after:bg-white after:transition-[left] after:duration-150",
-        on && "bg-brand after:left-[19px]",
-      )}
-      onClick={onChange}
+    <Switch.Root
+      checked={on}
+      onCheckedChange={() => onChange()}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={on}
-    />
+      className="flex h-6 w-10 flex-none items-center rounded-full bg-line p-[3px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand data-checked:bg-brand data-disabled:opacity-50"
+    >
+      <Switch.Thumb className="size-[18px] rounded-full bg-white transition-transform duration-150 data-checked:translate-x-4" />
+    </Switch.Root>
   );
 }
 
@@ -732,10 +735,19 @@ export function Field({ id, label, error, hint, children, className }: { id?: st
   );
 }
 
+/** Labelled checkbox (Base UI Checkbox). */
 export function Checkbox({ checked, onChange, children, className }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode; className?: string }) {
   return (
     <label className={cn("mt-3.5 flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-normal text-fg", className)}>
-      <input type="checkbox" className="mt-[3px] size-[17px] flex-none accent-brand" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <BaseCheckbox.Root
+        checked={checked}
+        onCheckedChange={(v) => onChange(v)}
+        className="mt-[3px] grid size-[17px] flex-none place-items-center rounded-[5px] border border-line bg-field text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand data-checked:border-brand data-checked:bg-brand"
+      >
+        <BaseCheckbox.Indicator className="data-unchecked:hidden">
+          <Check size={12} strokeWidth={3} />
+        </BaseCheckbox.Indicator>
+      </BaseCheckbox.Root>
       <span>{children}</span>
     </label>
   );

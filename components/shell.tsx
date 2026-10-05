@@ -1,16 +1,17 @@
 "use client";
 
+import { Toast as BaseToast } from "@base-ui/react/toast";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { LogIn } from "lucide-react";
 import { I, Logo } from "./icons";
 import { Soon } from "./ui";
 import { cn } from "cn";
 import { useApp } from "@/lib/store";
 import { initials } from "@/lib/format";
-import { onToast } from "@/lib/toast";
+import { toastManager } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
 import { RequireAuth } from "@/components/signin";
 import { ComingSoon } from "@/components/soon";
@@ -179,31 +180,28 @@ export function Frame({ children }: { children: ReactNode }) {
   );
 }
 
+/** Toast viewport (Base UI Toast), mounted once in the root layout. Shows the latest message above the bottom nav. */
 export function Toast() {
-  const [msg, setMsg] = useState("");
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    const off = onToast((m) => {
-      setMsg(m);
-      setOn(true);
-      clearTimeout(t);
-      t = setTimeout(() => setOn(false), 2200);
-    });
-    return () => {
-      off();
-      clearTimeout(t);
-    };
-  }, []);
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed bottom-[92px] left-1/2 z-[90] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas opacity-0 transition-opacity md:bottom-6",
-        on && "opacity-100",
-      )}
-      role="status"
-    >
-      {msg}
-    </div>
+    <BaseToast.Provider toastManager={toastManager} limit={1}>
+      <BaseToast.Portal>
+        <BaseToast.Viewport className="fixed bottom-[92px] left-1/2 z-[90] w-max max-w-[calc(100vw-32px)] -translate-x-1/2 md:bottom-6">
+          <ToastList />
+        </BaseToast.Viewport>
+      </BaseToast.Portal>
+    </BaseToast.Provider>
   );
+}
+
+function ToastList() {
+  const { toasts } = BaseToast.useToastManager();
+  return toasts.map((t) => (
+    <BaseToast.Root
+      key={t.id}
+      toast={t}
+      className="absolute bottom-0 left-1/2 w-max max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas transition-[opacity,translate] duration-200 data-ending-style:translate-y-2 data-ending-style:opacity-0 data-limited:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0"
+    >
+      <BaseToast.Title />
+    </BaseToast.Root>
+  ));
 }

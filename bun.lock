@@ -5,6 +5,7 @@
     "": {
       "name": "ceyfi",
       "dependencies": {
+        "@base-ui/react": "^1.8.0",
         "@privy-io/react-auth": "^3.47.0",
         "@tanstack/react-query": "^5.104.0",
         "class-variance-authority": "^0.7.1",

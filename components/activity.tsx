@@ -15,6 +15,7 @@ import { toast } from "@/lib/toast";
 export function ActivityTabs({ on }: { on: "history" | "recurring" }) {
   return (
     <Segmented
+      label="Activity"
       className="mx-2.5 mt-3 mb-1 md:mx-4 md:max-w-[340px]"
       items={[
         { href: "/activity", label: "History", on: on === "history" },
