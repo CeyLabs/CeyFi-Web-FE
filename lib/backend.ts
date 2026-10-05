@@ -128,7 +128,7 @@ export const isLive = (s: TxState) => LIVE.includes(s);
 export const stLabel = (s: string) =>
   (
     ({
-      charging: "Collecting",
+      charging: "Awaiting payment",
       converting: "Converting",
       paying_out: "Paying out",
       processing: "Processing",

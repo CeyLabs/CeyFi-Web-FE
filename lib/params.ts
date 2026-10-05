@@ -36,10 +36,18 @@ export const accountUrl = (p: Values<inferParserType<typeof accountParams>>) => 
 
 /** Master/detail lists: free-text search. */
 export const searchParams = { q: parseAsString.withDefault("") };
-const activitySer = createSerializer(searchParams);
-export const activityUrl = (q?: string) => activitySer("/activity", { q: q || null });
-/** A transaction in Activity, keeping the list's search. */
-export const activityTxUrl = (id: string, q?: string) => activitySer(`/activity/${id}`, { q: q || null });
+/** Activity: status filter. */
+export const activityFilters = ["all", "progress", "done", "attention"] as const;
+export const activityParams = { ...searchParams, f: parseAsStringLiteral(activityFilters).withDefault("all") };
+type ActivityView = { q?: string; f?: (typeof activityFilters)[number] };
+const activitySer = createSerializer(activityParams);
+/** Activity, optionally searched (a string) or with the list's current search and filter. */
+export const activityUrl = (v: string | ActivityView = {}) => {
+  const { q, f } = typeof v === "string" ? { q: v } : v;
+  return activitySer("/activity", { q: q || null, f: f && f !== "all" ? f : null });
+};
+/** A transaction in Activity, keeping the list's search and filter. */
+export const activityTxUrl = (id: string, { q, f }: ActivityView = {}) => activitySer(`/activity/${id}`, { q: q || null, f: f && f !== "all" ? f : null });
 
 export const recurringTypes = ["reload", "remit"] as const;
 export const recNewParams = {

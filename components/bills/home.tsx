@@ -65,7 +65,7 @@ export function BillsHome() {
             <SectionTitle action={paid.length ? <TitleLink href={billsUrl({ step: "history" })}>See all</TitleLink> : null}>Recent payments</SectionTitle>
             <ListPanel className="flex flex-1 flex-col">
               {paid.length ? (
-                paid.slice(0, 4).map((t) => <TxRow key={t.id} db={db} t={t} compact />)
+                paid.slice(0, 4).map((t) => <TxRow key={t.id} db={db} t={t} />)
               ) : (
                 <Empty title="No bill payments yet" className={emptyFill}>
                   Bills you pay show up here.
@@ -139,7 +139,7 @@ export function BillHistory() {
             </Card>
           </div>
           <ListPanel className="mt-3">
-            {paid.length ? paid.map((t) => <TxRow key={t.id} db={db} t={t} compact />) : <Empty title="No bill payments yet" />}
+            {paid.length ? paid.map((t) => <TxRow key={t.id} db={db} t={t} />) : <Empty title="No bill payments yet" />}
           </ListPanel>
         </div>
       </Pad>

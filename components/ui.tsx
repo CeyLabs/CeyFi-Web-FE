@@ -8,7 +8,7 @@ import Link from "next/link";
 import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search, X } from "lucide-react";
 import { cn } from "cn";
-import { CFG, PNAME } from "@/lib/config";
+import { CFG, PNAME, type Provider } from "@/lib/config";
 import { dTime, fmt, hue, initials, phone } from "@/lib/format";
 import { useFx, useUsdtRate } from "@/hooks/fx";
 import { isExpired, spentBy, type Counterparty, type DB, type Method } from "@/lib/backend";
@@ -128,27 +128,60 @@ export function Segmented({ items, label, className }: { items: { href: string; 
   );
 }
 
+const closeBtn = cn(iconBtn, "absolute top-3 right-3 z-10 text-muted hover:text-ink");
+const backdrop =
+  "fixed inset-0 min-h-dvh bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute";
+
 /**
- * Bottom sheet on phones, centred dialog on wider screens (Base UI Dialog, with focus trap and scroll lock).
- * Closes with the X button or Escape, but not a tap outside: sheets hold forms, and a stray tap shouldn't lose them.
+ * Modal sheet (Base UI Dialog, with focus trap and scroll lock). `side="center"` (default): a bottom sheet on phones and a
+ * centred dialog on wider screens, for short tasks and forms. `side="right"`: a full-height panel sliding in from the right,
+ * for details beside a list. Closes with the X button or Escape. A tap outside closes it only when `dismissible`: sheets
+ * holding forms leave it off, so a stray tap doesn't lose what was typed. Tall content scrolls inside.
  */
-export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label: string; children: ReactNode }) {
+export function Sheet({
+  open,
+  onClose,
+  label,
+  side = "center",
+  dismissible,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  label: string;
+  side?: "center" | "right";
+  dismissible?: boolean;
+  children: ReactNode;
+}) {
+  const close = (
+    <Dialog.Close className={closeBtn} aria-label="Close">
+      <X />
+    </Dialog.Close>
+  );
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()} disablePointerDismissal>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()} disablePointerDismissal={!dismissible}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 min-h-dvh bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
-        <Dialog.Viewport className="fixed inset-0 flex items-end justify-center md:items-center md:p-6">
+        <Dialog.Backdrop className={backdrop} />
+        {side === "right" ? (
           <Dialog.Popup
             aria-label={label}
-            className="relative w-full max-w-[460px] rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] outline-none transition-[translate,opacity,scale] duration-200 ease-out data-ending-style:translate-y-6 data-ending-style:opacity-0 data-starting-style:translate-y-6 data-starting-style:opacity-0 md:rounded-[22px] md:pb-[18px] md:data-ending-style:translate-y-0 md:data-ending-style:scale-[0.98] md:data-starting-style:translate-y-0 md:data-starting-style:scale-[0.98]"
+            className="fixed inset-y-0 right-0 flex h-dvh w-full max-w-[460px] flex-col border-l border-line bg-elevated outline-none transition-[translate,opacity] duration-250 ease-out data-ending-style:translate-x-10 data-ending-style:opacity-0 data-starting-style:translate-x-10 data-starting-style:opacity-0"
           >
-            <div className="mx-auto mb-3.5 h-1 w-10 rounded-full bg-line md:hidden" />
-            <Dialog.Close className={cn(iconBtn, "absolute top-3 right-3 text-muted hover:text-ink")} aria-label="Close">
-              <X />
-            </Dialog.Close>
-            {children}
+            {close}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-14 pb-[calc(24px+env(safe-area-inset-bottom))] md:px-7">{children}</div>
           </Dialog.Popup>
-        </Dialog.Viewport>
+        ) : (
+          <Dialog.Viewport className="fixed inset-0 flex items-end justify-center md:items-center md:p-6">
+            <Dialog.Popup
+              aria-label={label}
+              className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-[460px] flex-col rounded-t-[22px] border border-line bg-elevated p-[18px] pb-[calc(18px+env(safe-area-inset-bottom))] outline-none transition-[translate,opacity,scale] duration-200 ease-out data-ending-style:translate-y-6 data-ending-style:opacity-0 data-starting-style:translate-y-6 data-starting-style:opacity-0 md:max-h-[calc(100dvh-48px)] md:rounded-[22px] md:pb-[18px] md:data-ending-style:translate-y-0 md:data-ending-style:scale-[0.98] md:data-starting-style:translate-y-0 md:data-starting-style:scale-[0.98]"
+            >
+              <div className="mx-auto mb-3.5 h-1 w-10 flex-none rounded-full bg-line md:hidden" />
+              {close}
+              <div className="-mx-[18px] min-h-0 overflow-y-auto overscroll-contain px-[18px]">{children}</div>
+            </Dialog.Popup>
+          </Dialog.Viewport>
+        )}
       </Dialog.Portal>
     </Dialog.Root>
   );
@@ -382,7 +415,14 @@ export function Pmi({ k, children, className }: { k: string; children: ReactNode
   return <span className={cn(pmBase, PM_CLS[k], className)}>{children}</span>;
 }
 
-export function PmIcon({ m, className }: { m: Method | undefined | null; className?: string }) {
+/** A payment method's badge; for checkout payments with no saved method, the pay partner's (`provider`). */
+export function PmIcon({ m, provider, className }: { m: Method | undefined | null; provider?: Provider; className?: string }) {
+  if (!m && provider)
+    return (
+      <Pmi k={provider} className={className}>
+        {PNAME[provider][0]}
+      </Pmi>
+    );
   if (!m)
     return (
       <span className={cn(pmBase, "bg-line", className)}>—</span>
@@ -561,6 +601,7 @@ export function LRow({
   variant = "full",
   selected,
   href,
+  scroll,
   onClick,
   as,
   className,
@@ -574,6 +615,8 @@ export function LRow({
   variant?: keyof typeof LROW_COLS;
   selected?: boolean;
   href?: string;
+  /** Link rows: false keeps the page's scroll position, e.g. when the link opens a sheet over the list. */
+  scroll?: boolean;
   onClick?: () => void;
   /** Static row, for rows that hold their own controls. */
   as?: "div";
@@ -603,7 +646,7 @@ export function LRow({
   );
   if (as === "div") return <div className={cn(cls, "hover:bg-transparent")}>{body}</div>;
   return href ? (
-    <Link className={cls} href={href} aria-current={selected ? "true" : undefined}>
+    <Link className={cls} href={href} scroll={scroll} aria-current={selected ? "true" : undefined}>
       {body}
     </Link>
   ) : (
@@ -612,6 +655,33 @@ export function LRow({
     </button>
   );
 }
+
+/* ---------- table ---------- */
+
+/** Data table. Scrolls sideways inside its container rather than widening the page. */
+export function Table({ className, ...p }: ComponentProps<"table">) {
+  return (
+    <div className="relative w-full overflow-x-auto">
+      <table className={cn("w-full border-collapse text-left text-[14.5px] text-fg", className)} {...p} />
+    </div>
+  );
+}
+export const TableHeader = ({ className, ...p }: ComponentProps<"thead">) => <thead className={cn("[&_tr]:border-b [&_tr]:border-line-subtle", className)} {...p} />;
+export const TableBody = ({ className, ...p }: ComponentProps<"tbody">) => <tbody className={cn("[&_tr:last-child]:border-0", className)} {...p} />;
+/** Body row. `selected` highlights it (e.g. its details are open). */
+export function TableRow({ className, selected, ...p }: ComponentProps<"tr"> & { selected?: boolean }) {
+  return (
+    <tr
+      aria-selected={selected || undefined}
+      className={cn("border-b border-line-subtle transition-colors hover:bg-glass-subtle aria-selected:bg-glass", className)}
+      {...p}
+    />
+  );
+}
+export const TableHead = ({ className, ...p }: ComponentProps<"th">) => (
+  <th className={cn("h-10 px-3 align-middle text-[11.5px] font-normal tracking-[.4px] whitespace-nowrap text-muted uppercase first:pl-4 last:pr-4", className)} {...p} />
+);
+export const TableCell = ({ className, ...p }: ComponentProps<"td">) => <td className={cn("px-3 py-3 align-middle whitespace-nowrap first:pl-4 last:pr-4", className)} {...p} />;
 
 /* ---------- detail pane ---------- */
 

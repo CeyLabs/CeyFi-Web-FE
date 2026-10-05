@@ -4,7 +4,7 @@ import { Toast as BaseToast } from "@base-ui/react/toast";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { LogIn } from "lucide-react";
 import { I, Logo } from "./icons";
 import { Soon } from "./ui";
@@ -130,13 +130,19 @@ function BottomNav() {
   );
 }
 
-/** Master/detail selections (`/activity/:id`) keep the list's scroll position on wide screens. */
-const isSelection = (p: string) => /^\/(activity|recurring|wallet)\/(?!add|new)[^/]+$/.test(p);
+/** Master/detail selections (`/recurring/:id`, `/wallet/:id`) keep the list's scroll position on wide screens. */
+const isSelection = (p: string) => /^\/(recurring|wallet)\/(?!add|new)[^/]+$/.test(p);
+/** Activity details open in a sheet over the list, so moving within Activity never scrolls. */
+const inActivity = (p: string) => /^\/activity(\/|$)/.test(p);
 
 /** Replays the enter animation when switching sections. */
 function View({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const prev = useRef(pathname);
   useEffect(() => {
+    const within = inActivity(prev.current) && inActivity(pathname);
+    prev.current = pathname;
+    if (within) return;
     if (!isSelection(pathname) || matchMedia("(max-width:760px)").matches) scrollTo(0, 0);
   }, [pathname]);
   return (

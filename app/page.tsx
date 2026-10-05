@@ -134,7 +134,7 @@ export default function Home() {
             <SectionTitle action={db.tx.length ? <TitleLink href="/activity">See all</TitleLink> : null}>Recent activity</SectionTitle>
             <ListPanel>
               {db.tx.length ? (
-                db.tx.slice(0, 5).map((t) => <TxRow key={t.id} db={db} t={t} compact />)
+                db.tx.slice(0, 5).map((t) => <TxRow key={t.id} db={db} t={t} />)
               ) : (
                 <Empty title="No activity yet">Your payments and transfers will show up here.</Empty>
               )}
