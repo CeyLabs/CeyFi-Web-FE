@@ -6,7 +6,7 @@ import { Switch } from "@base-ui/react/switch";
 import { cva, type VariantProps } from "class-variance-authority";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { ArrowLeft, Check, ChevronRight, CircleAlert, Pencil, Search, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, CircleAlert, Pencil, Search, X } from "lucide-react";
 import { cn } from "cn";
 import { CFG, PNAME, type Provider } from "@/lib/config";
 import { dTime, fmt, hue, initials, phone } from "@/lib/format";
@@ -682,6 +682,47 @@ export const TableHead = ({ className, ...p }: ComponentProps<"th">) => (
   <th className={cn("h-10 px-3 align-middle text-[11.5px] font-normal tracking-[.4px] whitespace-nowrap text-muted uppercase first:pl-4 last:pr-4", className)} {...p} />
 );
 export const TableCell = ({ className, ...p }: ComponentProps<"td">) => <td className={cn("px-3 py-3 align-middle whitespace-nowrap first:pl-4 last:pr-4", className)} {...p} />;
+
+/** Page numbers to show: always the first, last and the current one's neighbours, with gaps as null. */
+function pageList(page: number, pages: number): (number | null)[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  const sorted = [...keep].sort((a, b) => a - b);
+  return sorted.flatMap((n, i) => (i && n - sorted[i - 1] > 1 ? [null, n] : [n]));
+}
+
+const pageBtn =
+  "grid h-9 min-w-9 place-items-center rounded-[10px] px-2 text-sm text-fg hover:bg-glass hover:text-ink disabled:pointer-events-none disabled:opacity-40 aria-[current=page]:bg-brand aria-[current=page]:text-white";
+
+/** Previous / page numbers / next, with a "Showing x–y of n" line. Hidden when everything fits on one page. */
+export function Pagination({ page, pages, from, to, total, onPage, className }: { page: number; pages: number; from: number; to: number; total: number; onPage: (n: number) => void; className?: string }) {
+  if (pages <= 1) return null;
+  return (
+    <nav aria-label="Pagination" className={cn("flex flex-wrap items-center justify-between gap-3", className)}>
+      <span className="text-[13px] text-muted">
+        Showing <span className="font-mono text-fg">{from}</span>–<span className="font-mono text-fg">{to}</span> of <span className="font-mono text-fg">{total}</span>
+      </span>
+      <div className="flex items-center gap-1">
+        <button className={pageBtn} onClick={() => onPage(page - 1)} disabled={page <= 1} aria-label="Previous page">
+          <ChevronLeft size={18} />
+        </button>
+        {pageList(page, pages).map((n, i) =>
+          n === null ? (
+            <span key={`gap${i}`} className="px-1 text-muted">
+              …
+            </span>
+          ) : (
+            <button key={n} className={cn(pageBtn, "font-mono")} onClick={() => onPage(n)} aria-current={n === page ? "page" : undefined}>
+              {n}
+            </button>
+          ),
+        )}
+        <button className={pageBtn} onClick={() => onPage(page + 1)} disabled={page >= pages} aria-label="Next page">
+          <ChevronRight size={18} />
+        </button>
+      </div>
+    </nav>
+  );
+}
 
 /* ---------- detail pane ---------- */
 

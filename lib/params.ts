@@ -1,4 +1,4 @@
-import { createParser, createSerializer, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
+import { createParser, createSerializer, parseAsInteger, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
 import { BILL_CATS, type BillCat } from "./config";
 
 type Values<T extends Record<string, unknown>> = { [K in keyof T]?: T[K] | null };
@@ -38,16 +38,14 @@ export const accountUrl = (p: Values<inferParserType<typeof accountParams>>) => 
 export const searchParams = { q: parseAsString.withDefault("") };
 /** Activity: status filter. */
 export const activityFilters = ["all", "progress", "done", "attention"] as const;
-export const activityParams = { ...searchParams, f: parseAsStringLiteral(activityFilters).withDefault("all") };
-type ActivityView = { q?: string; f?: (typeof activityFilters)[number] };
+export const activityParams = { ...searchParams, f: parseAsStringLiteral(activityFilters).withDefault("all"), p: parseAsInteger.withDefault(1) };
+type ActivityView = { q?: string; f?: (typeof activityFilters)[number]; p?: number };
 const activitySer = createSerializer(activityParams);
-/** Activity, optionally searched (a string) or with the list's current search and filter. */
-export const activityUrl = (v: string | ActivityView = {}) => {
-  const { q, f } = typeof v === "string" ? { q: v } : v;
-  return activitySer("/activity", { q: q || null, f: f && f !== "all" ? f : null });
-};
-/** A transaction in Activity, keeping the list's search and filter. */
-export const activityTxUrl = (id: string, { q, f }: ActivityView = {}) => activitySer(`/activity/${id}`, { q: q || null, f: f && f !== "all" ? f : null });
+const viewParams = ({ q, f, p }: ActivityView) => ({ q: q || null, f: f && f !== "all" ? f : null, p: p && p > 1 ? p : null });
+/** Activity, optionally searched (a string) or with the list's current search, filter and page. */
+export const activityUrl = (v: string | ActivityView = {}) => activitySer("/activity", viewParams(typeof v === "string" ? { q: v } : v));
+/** A transaction in Activity, keeping the list's search, filter and page. */
+export const activityTxUrl = (id: string, v: ActivityView = {}) => activitySer(`/activity/${id}`, viewParams(v));
 
 export const recurringTypes = ["reload", "remit"] as const;
 export const recNewParams = {

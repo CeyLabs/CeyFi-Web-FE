@@ -179,10 +179,22 @@ export const sellPaymentQuery = (id: string) =>
     queryFn: () => api<SellPayment>(`/ceyfi/payment/${encodeURIComponent(id)}`, { auth: true }),
   });
 
+/** Most pages fetched per refresh (100 sales each), as a guard against runaway loops. */
+const ACTIVITY_MAX_PAGES = 20;
+
+/** All of the user's sales, newest first: the backend pages them 100 at a time. */
 export const sellActivityQuery = () =>
   queryOptions({
     queryKey: sellKeys.activity(),
-    queryFn: () => api<{ data: SellPayment[]; total: number }>("/ceyfi/activity?limit=100", { auth: true }),
+    queryFn: async () => {
+      const data: SellPayment[] = [];
+      for (let page = 1; page <= ACTIVITY_MAX_PAGES; page++) {
+        const r = await api<{ data: SellPayment[]; total: number }>(`/ceyfi/activity?limit=100&page=${page}`, { auth: true });
+        data.push(...r.data);
+        if (!r.data.length || data.length >= r.total) return { data, total: r.total };
+      }
+      return { data, total: data.length };
+    },
   });
 
 export const createSell = (q: QuoteInput & { ceyfiBankId: string }) =>

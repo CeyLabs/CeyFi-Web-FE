@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { TxRow, TxTable } from "@/components/activity";
-import { ButtonLink, Empty, PageHead, SearchBox } from "@/components/ui";
+import { ButtonLink, Empty, PageHead, Pagination, SearchBox } from "@/components/ui";
 import { cn } from "cn";
 import { lkr } from "@/lib/format";
 import { tradeUrl } from "@/lib/params";
@@ -18,7 +18,7 @@ const FILTERS: [ActivityFilter, string][] = [
 /** Activity: status filters and the list by month. `/activity/:id` opens details in the layout's side panel. */
 export default function ActivityPage() {
   const { id: [id] = [] } = useParams<{ id?: string[] }>();
-  const { db, q, filter, setQuery, setFilter, list, months, counts, empty } = useActivity();
+  const { db, q, filter, setQuery, setFilter, page, pages, from, to, total, setPage, items, months, counts, empty } = useActivity();
 
   return (
     <>
@@ -55,15 +55,27 @@ export default function ActivityPage() {
                       {m.total > 0 && <span className="font-mono text-[12.5px] text-muted">{lkr(m.total)}</span>}
                     </div>
                     {m.items.map((x) => (
-                      <TxRow key={x.id} db={db} t={x} selected={x.id === id} q={q} f={filter} />
+                      <TxRow key={x.id} db={db} t={x} selected={x.id === id} q={q} f={filter} p={page} />
                     ))}
                   </section>
                 ))}
               </div>
               {/* Tablet and up: a table. */}
               <div className="mx-2.5 mt-2 overflow-hidden rounded-2xl border border-line bg-glass-subtle max-md:hidden md:mx-4">
-                <TxTable db={db} items={list} selectedId={id} q={q} f={filter} />
+                <TxTable db={db} items={items} selectedId={id} q={q} f={filter} p={page} />
               </div>
+              <Pagination
+                page={page}
+                pages={pages}
+                from={from}
+                to={to}
+                total={total}
+                onPage={(n) => {
+                  setPage(n);
+                  scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="mx-2.5 mt-4 md:mx-4"
+              />
             </>
           ) : (
             <Empty title={empty ? "No activity yet" : "Nothing here"} className="py-16">

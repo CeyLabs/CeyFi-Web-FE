@@ -57,11 +57,11 @@ function PaidWith({ db, t }: { db: DB; t: Tx }) {
 }
 
 /** One-column activity row, for phones and Home. `q`/`f` keep the list's search and filter. */
-export function TxRow({ db, t, selected, q, f }: { db: DB; t: Tx; selected?: boolean; q?: string; f?: ActivityFilter }) {
+export function TxRow({ db, t, selected, q, f, p }: { db: DB; t: Tx; selected?: boolean; q?: string; f?: ActivityFilter; p?: number }) {
   return (
     <LRow
       variant="w3"
-      href={activityTxUrl(t.id, { q, f })}
+      href={activityTxUrl(t.id, { q, f, p })}
       // Details open in a panel over the list; the frame scrolls to top when arriving from another section.
       scroll={false}
       selected={selected}
@@ -79,7 +79,7 @@ export function TxRow({ db, t, selected, q, f }: { db: DB; t: Tx; selected?: boo
 }
 
 /** Activity as a table (tablet and up), newest first, with clickable rows. */
-export function TxTable({ db, items, selectedId, q, f }: { db: DB; items: Tx[]; selectedId?: string; q?: string; f?: ActivityFilter }) {
+export function TxTable({ db, items, selectedId, q, f, p }: { db: DB; items: Tx[]; selectedId?: string; q?: string; f?: ActivityFilter; p?: number }) {
   return (
     <Table>
       <TableHeader>
@@ -100,7 +100,7 @@ export function TxTable({ db, items, selectedId, q, f }: { db: DB; items: Tx[]; 
                 <CpLogo cp={t.cp} />
                 <span className="min-w-0">
                   <Link
-                    href={activityTxUrl(t.id, { q, f })}
+                    href={activityTxUrl(t.id, { q, f, p })}
                     scroll={false}
                     className="block truncate text-ink outline-none after:absolute after:inset-0 focus-visible:after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-brand"
                   >
@@ -346,7 +346,7 @@ export function TxDetail({ t }: { t: Tx }) {
 export function ActivitySheet() {
   const router = useRouter();
   const { id: [id] = [] } = useParams<{ id?: string[] }>();
-  const [{ q, f }] = useQueryStates(activityParams);
+  const [{ q, f, p }] = useQueryStates(activityParams);
   const { db } = useApp();
   const t = id ? db.tx.find((x) => x.id === id) : undefined;
   // Keep the last transaction while the panel slides out; the URL (and so `t`) clears as soon as it starts closing.
@@ -354,7 +354,7 @@ export function ActivitySheet() {
   if (t && t !== shown) setShown(t);
 
   return (
-    <Sheet open={!!t} onClose={() => router.push(activityUrl({ q, f }), { scroll: false })} label={shown ? txTitle(db, shown) : "Transaction"} side="right" dismissible>
+    <Sheet open={!!t} onClose={() => router.push(activityUrl({ q, f, p }), { scroll: false })} label={shown ? txTitle(db, shown) : "Transaction"} side="right" dismissible>
       {shown && <TxDetail key={shown.id} t={shown} />}
     </Sheet>
   );
