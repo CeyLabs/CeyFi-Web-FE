@@ -72,6 +72,9 @@ export function patchDraft(p: Partial<Draft>) {
   Object.assign(state.draft, p);
 }
 
+/** The whole store, readable outside React (event handlers, effects). */
+export const currentDb = () => (load(), state.db);
+
 /** The signed-in user, readable outside React, e.g. in event handlers. */
 export const currentUser = () => (load(), state.db.user);
 export const signedIn = () => !!currentUser();

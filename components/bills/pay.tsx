@@ -31,12 +31,12 @@ import { Missing, Pending } from "./shared";
 import { CheckoutPanel, ProviderPicker } from "../pay-with";
 import { cn } from "cn";
 import { BILL_CATS, EMAIL_RE, MOBILE_RE, PNAME, type Provider } from "@/lib/config";
-import { fmt, lkr, toNum, uid } from "@/lib/format";
+import { fmt, lkr, toNum } from "@/lib/format";
 import { useRate } from "@/hooks/fx";
 import { billerCp, lastPaid, newTx, txTitle } from "@/lib/backend";
 import { PROVIDER_CODE, billPhase, providerOf, type BillCheck, type Biller, type BillPayment } from "@/lib/api/bills";
 import { isClientError } from "@/lib/api/client";
-import { useBillCheck, useBillPayment, useBiller, useCreateBillPayment, useSyncBillTx } from "@/hooks/bills";
+import { useBillCheck, useBillPayment, useBiller, useCreateBillPayment, useRemoveSavedBiller, useSaveBiller, useSavedBillers, useSyncBillTx } from "@/hooks/bills";
 import { billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
@@ -48,9 +48,14 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   const router = useRouter();
   const { db } = useApp();
   const rate = useRate();
-  const sb = saved ? db.billers.find((x) => x.id === saved) : undefined;
+  const mine = useSavedBillers();
+  const sb = saved ? mine.saved.find((x) => x.id === saved) : undefined;
   const account = sb ? sb.account : (acct || "").trim();
-  const { biller: b, isPending, error, refetch } = useBiller(sb ? sb.code : code);
+  const { biller: b, isPending: billerPending, error: billerError, refetch } = useBiller(sb ? sb.code : code);
+  const removeSaved = useRemoveSavedBiller();
+  // A saved biller's id resolves once your saved list has loaded.
+  const isPending = billerPending || (!!saved && mine.isPending);
+  const error = billerError ?? (saved ? mine.error : null);
   const check = useBillCheck(b?.id, account);
 
   // Null until the user types: postpaid bills start from the amount due.
@@ -59,9 +64,14 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   const [review, setReview] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const [armed, remove] = useArmed(() => {
-    commit((db) => void (db.billers = db.billers.filter((x) => x.id !== sb?.id)));
-    toast("Biller removed");
-    router.replace(billsUrl());
+    if (!sb) return;
+    removeSaved.mutate(sb.id, {
+      onSuccess: () => {
+        toast("Biller removed");
+        router.replace(billsUrl());
+      },
+      onError: (e) => toast(e.message),
+    });
   });
 
   useEffect(() => {
@@ -132,7 +142,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
           <div className="mb-4 flex items-center gap-3">
             <CpLogo cp={billerCp(b)} />
             <div className="min-w-0 flex-1">
-              <b className="block truncate font-medium text-ink">{db.names[b.id] || b.name}</b>
+              <b className="block truncate font-medium text-ink">{sb?.nickname || db.names[b.id] || b.name}</b>
               <div className={fine}>{BILL_CATS[b.cat].label}</div>
             </div>
           </div>
@@ -506,19 +516,18 @@ function Checkout({ p, via, usdt }: { p: BillPayment; via: string; usdt?: number
 }
 
 function SaveBiller({ code, account, name }: { code?: string; account?: string; name: string }) {
-  const { db } = useApp();
-  if (!code || !account || db.billers.some((x) => x.code === code && x.account === account)) return null;
-  const save = () => {
-    commit((db) => void db.billers.unshift({ id: uid("bl_"), code, account, created: Date.now() }));
-    toast(`${name} saved`);
-  };
+  const { saved, isPending } = useSavedBillers();
+  const saveBiller = useSaveBiller();
+  if (!code || !account || isPending || saved.some((x) => x.code === code && x.account === account)) return null;
+  const save = () =>
+    saveBiller.mutate({ billerId: code, account }, { onSuccess: () => toast(`${name} saved`), onError: (e) => toast(e.message) });
   return (
     <Panel className="flex flex-wrap items-center gap-3">
       <div className="min-w-[200px] flex-1 text-left">
         <b className="block font-medium text-ink">Pay faster next time</b>
         <span className={fine}>Save {name} to pay it again in one tap.</span>
       </div>
-      <Button variant="ghost" onClick={save}>
+      <Button variant="ghost" disabled={saveBiller.isPending} onClick={save}>
         Save biller
       </Button>
     </Panel>

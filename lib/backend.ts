@@ -183,7 +183,8 @@ export function nextRun(x: Recurring) {
 
 /* ---------- saved billers ---------- */
 
-export type SavedBiller = { id: string; code: string; account: string; created: number };
+/** A biller account to pay again. Signed in: from /ceyfi/billers. Guests: kept in the browser (`db.billers`). */
+export type SavedBiller = { id: string; code: string; account: string; nickname?: string | null; created: number };
 
 export const billerCp = (b: Pick<Biller, "id" | "name">): Counterparty => ({ kind: "biller", code: b.id, name: b.name, key: b.id });
 

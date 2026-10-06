@@ -10,12 +10,11 @@ import { CAT_ICON, CATS, Missing, Pending, acct4 } from "./shared";
 import { searchLink } from "./home";
 import { cn } from "cn";
 import { BILL_CATS, type BillCat } from "@/lib/config";
-import { useBiller, useBillers, useVerifyBillAccount } from "@/hooks/bills";
-import { uid } from "@/lib/format";
+import { useBiller, useBillers, useSaveBiller, useSavedBillers, useVerifyBillAccount } from "@/hooks/bills";
 import { billerCp } from "@/lib/backend";
 import type { Biller } from "@/lib/api/bills";
 import { billsParams, billsUrl } from "@/lib/params";
-import { commit, useApp } from "@/lib/store";
+import { useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
 const chip = "flex flex-none items-center gap-1.5 rounded-full border border-line bg-glass-subtle px-3 py-[6px] text-[13px] text-fg hover:border-brand hover:text-ink [&_svg]:size-[14px]";
@@ -34,7 +33,8 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
   const cats = billers ? CATS.filter(([k]) => billers.some((b) => b.cat === k)) : [];
   const count = (k: BillCat) => matching.filter((b) => b.cat === k).length;
   // Saved billers lead the page until you search or pick a category.
-  const saved = !needle && !cat && billers ? db.billers.flatMap((s) => billers.filter((b) => b.id === s.code).map((b) => ({ s, b }))) : [];
+  const { saved: mySaved } = useSavedBillers();
+  const saved = !needle && !cat && billers ? mySaved.flatMap((s) => billers.filter((b) => b.id === s.code).map((b) => ({ s, b }))) : [];
 
   return (
     <>
@@ -75,7 +75,7 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
                   <SectionTitle>Saved</SectionTitle>
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     {saved.map(({ s, b }) => (
-                      <BillerCard key={s.id} b={b} name={db.names[b.id] || b.name} sub={`Acct ${acct4(s.account)}`} href={billsUrl({ step: "pay", saved: s.id })} saved />
+                      <BillerCard key={s.id} b={b} name={s.nickname || db.names[b.id] || b.name} sub={`Acct ${acct4(s.account)}`} href={billsUrl({ step: "pay", saved: s.id })} saved />
                     ))}
                   </div>
                 </>
@@ -84,7 +84,7 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
               {list.length ? (
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   {list.map((b) => {
-                    const mine = db.billers.find((x) => x.code === b.id);
+                    const mine = mySaved.find((x) => x.code === b.id);
                     return (
                       <BillerCard
                         key={b.id}
@@ -135,12 +135,13 @@ function BillerCard({ b, name, sub, href, saved }: { b: Biller; name: string; su
 /** Account number for a new biller, with the option to save it. */
 export function AccountStep({ code }: { code: string | null }) {
   const router = useRouter();
-  const { db } = useApp();
   const { biller: b, isPending, error, refetch } = useBiller(code);
   const [acct, setAcct] = useState("");
   const [save, setSave] = useState(true);
   const { errs, clear, check } = useErrors(["ba"] as const);
   const verify = useVerifyBillAccount();
+  const { saved: mySaved } = useSavedBillers();
+  const saveBiller = useSaveBiller();
   if (isPending || error)
     return (
       <>
@@ -154,7 +155,7 @@ export function AccountStep({ code }: { code: string | null }) {
   const go = () => {
     const a = acct.replace(/\s/g, "");
     const ok = b.accountRe ? b.accountRe.test(a) : a.length > 0;
-    if (!check({ ba: ok ? "" : `Enter the ${b.accountLabel.toLowerCase()} from your bill` }) || verify.isPending) return;
+    if (!check({ ba: ok ? "" : `Enter the ${b.accountLabel.toLowerCase()} from your bill` }) || verify.isPending || saveBiller.isPending) return;
     // The format looks right; now ask the biller whether the account exists.
     verify.mutate(
       { billerId: b.id, account: a },
@@ -167,13 +168,21 @@ export function AccountStep({ code }: { code: string | null }) {
   };
   const next = (a: string) => {
     if (!save) return router.push(billsUrl({ step: "pay", biller: b.id, acct: a }));
-    let id = db.billers.find((x) => x.code === b.id && x.account === a)?.id;
-    if (!id) {
-      const nid = (id = uid("bl_"));
-      commit((db) => void db.billers.unshift({ id: nid, code: b.id, account: a, created: Date.now() }));
-      toast(`${b.name} saved`);
-    }
-    router.push(billsUrl({ step: "pay", saved: id }));
+    const known = mySaved.some((x) => x.code === b.id && x.account === a);
+    saveBiller.mutate(
+      { billerId: b.id, account: a },
+      {
+        onSuccess: (s) => {
+          if (!known) toast(`${b.name} saved`);
+          router.push(billsUrl({ step: "pay", saved: s.id }));
+        },
+        // Saving is a convenience: if it fails, still go on to pay.
+        onError: (e) => {
+          toast(`Couldn’t save ${b.name}: ${e.message}`);
+          router.push(billsUrl({ step: "pay", biller: b.id, acct: a }));
+        },
+      },
+    );
   };
 
   return (
@@ -203,8 +212,8 @@ export function AccountStep({ code }: { code: string | null }) {
             </div>
             <Toggle on={save} onChange={() => setSave(!save)} label="Save this biller" />
           </div>
-          <Button size="lg" className="mt-[18px]" disabled={verify.isPending} onClick={go}>
-            {verify.isPending ? (
+          <Button size="lg" className="mt-[18px]" disabled={verify.isPending || saveBiller.isPending} onClick={go}>
+            {verify.isPending || saveBiller.isPending ? (
               <>
                 <Loader2 className="animate-spin" /> Checking with {b.name}
               </>

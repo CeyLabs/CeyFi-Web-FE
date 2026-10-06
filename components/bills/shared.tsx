@@ -36,7 +36,7 @@ export function SavedRow({ db, b, detail }: { db: DB; b: SavedBiller; detail?: b
       variant="w3"
       href={billsUrl({ step: "pay", saved: b.id })}
       logo={<CpLogo cp={billerCp(biller)} />}
-      title={db.names[biller.id] || biller.name}
+      title={b.nickname || db.names[biller.id] || biller.name}
       sub={last ? `Last paid ${lkr(last.lkr)} · ${dShort(last.created)}` : `${BILL_CATS[biller.cat].label} · Acct ${acct4(b.account)}`}
       end={<span className={button({ size: "sm", className: "font-sans" })}>Pay</span>}
     />

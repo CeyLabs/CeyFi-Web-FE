@@ -15,7 +15,7 @@ import { toastManager } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
 import { RequireAuth } from "@/components/signin";
 import { ComingSoon } from "@/components/soon";
-import { BillTxSync } from "@/hooks/bills";
+import { BillTxSync, SavedBillerSync } from "@/hooks/bills";
 import { SellTxSync } from "@/hooks/sell";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
@@ -181,6 +181,7 @@ export function Frame({ children }: { children: ReactNode }) {
       </div>
       <BottomNav />
       <BillTxSync />
+      <SavedBillerSync />
       <SellTxSync />
     </>
   );
