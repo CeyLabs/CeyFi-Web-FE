@@ -29,7 +29,7 @@ export function Providers({ children }: { children: ReactNode }) {
       clientId={process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID || undefined}
       config={{
         // Also enable these in the Privy dashboard (Login methods).
-        loginMethods: ["sms", "email", "google", "apple"],
+        loginMethods: ["email", "google", "apple"],
         appearance: { theme: "dark", accentColor: "#1c6ef5" },
       }}
     >
