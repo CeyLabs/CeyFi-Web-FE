@@ -27,6 +27,7 @@ const toSaved = (d: SavedBillerDto): SavedBiller => ({
   created: Date.parse(d.createdAt),
 });
 
+/** Under the per-user prefix, so sign-out drops it (see hooks/auth). */
 export const billerKeys = { saved: () => ["ceyfi", "billers"] as const };
 
 export const savedBillersQuery = () =>

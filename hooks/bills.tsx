@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { billerKeys, removeBiller, saveBiller, savedBillersQuery } from "@/lib/api/billers";
 import { billCheckQuery, billKeys, billPaymentQuery, billPhase, billersQuery, createBillPayment, isFinal, type BillPayment } from "@/lib/api/bills";
 import { isLive, type SavedBiller, type Tx } from "@/lib/backend";
@@ -19,12 +19,17 @@ export function useBiller(id: string | null | undefined) {
   return { ...q, biller: q.data };
 }
 
-/** Your saved billers: from the backend when signed in, from the browser for guests (paying stays anonymous). */
+/**
+ * Your saved billers: from the backend when signed in, from the browser for guests (paying stays anonymous).
+ * Billers saved in this browser before signing in stay here and are listed alongside the account's, so none go missing.
+ */
 export function useSavedBillers() {
   const { db } = useApp();
   const signedIn = !!db.user;
   const q = useQuery({ ...savedBillersQuery(), enabled: signedIn });
-  return { saved: signedIn ? (q.data ?? []) : db.billers, isPending: signedIn && q.isPending, error: q.error };
+  const server = q.data ?? [];
+  const saved = signedIn ? [...server, ...db.billers.filter((l) => !server.some((s) => s.code === l.code && s.account === l.account))] : db.billers;
+  return { saved, isPending: signedIn && q.isPending, error: q.error };
 }
 
 /** Saved billers that still exist in the live catalog. Empty until the catalog loads. */
@@ -58,43 +63,12 @@ export function useRemoveSavedBiller() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      if (currentUser()) return removeBiller(id);
+      // Browser entries (saved as a guest) are removed locally; the backend wouldn't know them.
+      if (currentUser() && !currentDb().billers.some((x) => x.id === id)) return removeBiller(id);
       commit((db) => void (db.billers = db.billers.filter((x) => x.id !== id)));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: billerKeys.saved() }),
   });
-}
-
-/**
- * Mounted once in the app frame: after a guest signs in, moves the billers they saved in this browser to their
- * account (saving is idempotent, so nothing doubles up), then forgets the local copy.
- */
-export function SavedBillerSync() {
-  const { db } = useApp();
-  const qc = useQueryClient();
-  const running = useRef(false);
-  const signedIn = !!db.user;
-  const pending = db.billers.length;
-  useEffect(() => {
-    if (!signedIn || !pending || running.current) return;
-    running.current = true;
-    const local = [...currentDb().billers];
-    void (async () => {
-      const moved = new Set<string>();
-      for (const b of local) {
-        try {
-          await saveBiller({ billerId: b.code, accountNumber: b.account, nickname: b.nickname });
-          moved.add(b.id);
-        } catch {
-          // Left in the browser to retry next time (e.g. offline, or a biller PayGo no longer lists).
-        }
-      }
-      commit((db) => void (db.billers = db.billers.filter((x) => !moved.has(x.id))));
-      await qc.invalidateQueries({ queryKey: billerKeys.saved() });
-      running.current = false;
-    })();
-  }, [signedIn, pending, qc]);
-  return null;
 }
 
 /** The biller's view of an account: whether it exists, the holder's name, the amount due (postpaid) and limits. */
