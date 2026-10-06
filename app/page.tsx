@@ -8,6 +8,7 @@ import { Button, ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, Rate
 import { cn } from "cn";
 import { dShort, fmt } from "@/lib/format";
 import { useRate, useRateHistory, useUsdtRate } from "@/hooks/fx";
+import { colomboDay } from "@/lib/api/rates";
 import { useBanks } from "@/hooks/sell";
 import { useApp } from "@/lib/store";
 import { accountUrl, tradeUrl } from "@/lib/params";
@@ -23,7 +24,7 @@ export default function Home() {
   const live = useUsdtRate().data;
   // Daily closing rates; today's point follows the live rate.
   const days = useRateHistory(14).data ?? [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = colomboDay(new Date());
   const before = days.filter((d) => d.date !== today);
   const pts = [...before.map((d) => d.rate), r];
   /** The last earlier day with a rate. History can have gaps, so it isn't always yesterday. */

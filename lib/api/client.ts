@@ -55,7 +55,13 @@ export async function api<T>(path: string, { auth, ...init }: Init = {}): Promis
   if (!res.ok) throw await errorOf(res);
   // 204s and empty bodies (DELETE, PATCH) have nothing to parse.
   const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // e.g. an HTML page from a proxy, or an API URL pointing at the wrong server
+    throw new ApiError(res.status, "CeyPay sent an unexpected response. Try again in a moment.");
+  }
 }
 
 /** 4xx means the request itself is wrong, so retrying won't help. */
