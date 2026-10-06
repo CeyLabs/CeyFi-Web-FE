@@ -1,13 +1,20 @@
 "use client";
 
 import { useLinkAccount, useLogin, usePrivy, type User as PrivyUser } from "@privy-io/react-auth";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { ApiError } from "@/lib/api/client";
 import { kycOf } from "@/lib/api/kyc";
-import { getMe, type Me } from "@/lib/api/user";
+import { syncMe, userDataKey, type Me } from "@/lib/api/user";
 import { onSignIn } from "@/lib/auth";
 import { commit, currentUser, resetAll, signOut, signedIn } from "@/lib/store";
 import { toast } from "@/lib/toast";
+
+/** Ends the local session: the store, and every cached per-user query, so the next account never sees this one's data. */
+function endSession(qc: QueryClient) {
+  signOut();
+  qc.removeQueries({ queryKey: userDataKey });
+}
 
 const nameOf = (pu: PrivyUser, me: Me) =>
   me.kyc.verifiedName || pu.google?.name || (me.email ?? pu.email?.address)?.split("@")[0] || me.phone || "CeyPay user";
@@ -18,6 +25,7 @@ const nameOf = (pu: PrivyUser, me: Me) =>
  */
 export function usePrivySession() {
   const { ready, authenticated, user, logout } = usePrivy();
+  const qc = useQueryClient();
   /** Runs after the next successful sign-in. */
   const then = useRef<(() => void) | null>(null);
   /** A sign-in asked for before Privy was ready. */
@@ -27,11 +35,13 @@ export function usePrivySession() {
 
   const sync = (pu: PrivyUser) => {
     if (syncing.current?.id === pu.id) return syncing.current.p;
-    const p = getMe().then(
+    const p: Promise<boolean> = syncMe().then(
       (me) => {
+        // Superseded (signed out, or another account's sync started) while this was in flight: don't write it.
+        if (syncing.current?.p !== p) return false;
         // A different account than the one stored: drop the old one's data first.
         const prev = currentUser();
-        if (prev && prev.privyId !== pu.id) signOut();
+        if (prev && prev.privyId !== pu.id) endSession(qc);
         commit((db) => {
           db.user = { id: me.id, privyId: pu.id, name: nameOf(pu, me), email: me.email ?? pu.google?.email ?? pu.apple?.email ?? "", phone: me.phone ?? pu.phone?.number ?? "", since: Date.parse(me.createdAt) };
           db.kyc = kycOf(me.kyc.status);
@@ -43,7 +53,7 @@ export function usePrivySession() {
         // Rejected or suspended: drop the Privy session too, so the user can sign in again.
         if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
           await logout();
-          signOut();
+          endSession(qc);
         }
         toast(e instanceof Error ? e.message : "Couldn’t sign you in. Try again.");
         return false;
@@ -76,7 +86,7 @@ export function usePrivySession() {
     if (!ready) return;
     if (!authenticated || !user) {
       syncing.current = null;
-      if (signedIn()) signOut();
+      if (signedIn()) endSession(qc);
       return;
     }
     void sync(user);
@@ -107,10 +117,13 @@ export function usePrivySession() {
 /** Ends the Privy session and clears local data. `reset` also wipes everything else stored (demo reset). */
 export function useSignOut() {
   const { logout } = usePrivy();
+  const qc = useQueryClient();
   return async ({ reset = false } = {}) => {
     await logout();
-    if (reset) resetAll();
-    else signOut();
+    if (reset) {
+      resetAll();
+      qc.removeQueries({ queryKey: userDataKey });
+    } else endSession(qc);
   };
 }
 
