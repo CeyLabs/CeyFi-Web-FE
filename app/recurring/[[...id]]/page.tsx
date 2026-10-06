@@ -106,9 +106,6 @@ function RecDetail({ x }: { x: Recurring }) {
       commit((_, d) => {
         d.incur = "LKR";
         d.amount = String(x.amount);
-        d.payee.send = x.payee_id || null;
-        d.account = m.id;
-        d.q = null;
       });
       router.push(tradeUrl({ tab: "send" }));
       return;

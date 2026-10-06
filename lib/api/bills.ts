@@ -127,7 +127,7 @@ export function billPhase(p: Pick<BillPayment, "status" | "billStatus">): BillPh
 export const isFinal = (phase: BillPhase) => phase !== "checkout" && phase !== "paying";
 
 /** `expireTime` arrives as epoch ms (number or numeric string) or an ISO date. */
-export const expiresAt = (p: BillPayment) => {
+export const expiresAt = (p: Pick<BillPayment, "expireTime">) => {
   const v = p.expireTime;
   if (v === null || v === undefined || v === "") return null;
   const t = typeof v === "number" || /^\d+$/.test(v) ? Number(v) : Date.parse(v);

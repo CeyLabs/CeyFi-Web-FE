@@ -1,50 +1,64 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import { ButtonLink, CpLogo, Empty, LRow, ListPanel, PageHead, Pad, SectionTitle, Stat, col } from "../ui";
-import type { Tab } from "@/lib/config";
-import { mask } from "@/lib/format";
-import { accountUrl, tradeUrl } from "@/lib/params";
-import { activePayee, commit, payeesFor, useApp } from "@/lib/store";
+import { Button, CpLogo, Empty, LRow, ListPanel, PageHead, Pad, SectionTitle, Stat, col } from "../ui";
+import { Pending } from "../bills/shared";
+import { cn } from "cn";
+import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
+import { useSelectedBank } from "@/hooks/sell";
+import { tradeUrl } from "@/lib/params";
+import { openAddBank } from "@/lib/add-bank";
 
-/** Choose where the rupees go. */
-export function PayeePicker({ tab, onDone }: { tab: Tab; onDone: () => void }) {
-  const self = tab === "sell";
-  const { db, draft } = useApp();
-  const l = payeesFor(db, tab);
-  const cur = activePayee(db, draft, tab);
+/** Choose which of your bank accounts the rupees go to. */
+export function BankPicker({ onDone }: { onDone: () => void }) {
+  const { data, error, refetch, bank: cur, select } = useSelectedBank();
 
   return (
     <>
-      <PageHead title={self ? "Pay out to" : "Send to"} back={tradeUrl({ tab })} />
-      <Pad>
-        <div className={col}>
-          <ListPanel>
-            {l.length ? (
-              l.map((p) => (
-                <LRow
-                  key={p.id}
-                  variant="w3"
-                  onClick={() => {
-                    commit((_, d) => void (d.payee[tab] = p.id));
-                    onDone();
-                  }}
-                  logo={<CpLogo cp={{ kind: "person", name: p.account_name }} />}
-                  title={self ? p.bank_name : p.nickname || p.account_name}
-                  sub={self ? mask(p.account_number) : `${p.bank_name} ${mask(p.account_number)} · ${p.relationship}`}
-                  end={cur?.id === p.id && <Stat className="font-sans">Selected</Stat>}
-                />
-              ))
-            ) : (
-              <Empty>None yet</Empty>
-            )}
-          </ListPanel>
-          <SectionTitle>Or add new</SectionTitle>
-          <ButtonLink size="lg" href={accountUrl({ flow: "payee", self, ret: tradeUrl({ tab }) })}>
-            <Plus /> {self ? "Add bank account" : "Add recipient"}
-          </ButtonLink>
-        </div>
-      </Pad>
+      <PageHead title="Pay out to" back={tradeUrl({ tab: "sell" })} />
+      {!data ? (
+        <Pending error={error} onRetry={() => refetch()} label="Loading your bank accounts" />
+      ) : (
+        <Pad>
+          <div className={cn(col, "mx-auto")}>
+            <ListPanel>
+              {data.length ? (
+                data.map((b) => {
+                  const st = BANK_STATUS[b.status];
+                  return (
+                    <LRow
+                      key={b.id}
+                      variant="w3"
+                      onClick={() => {
+                        select(b.id);
+                        onDone();
+                      }}
+                      logo={<CpLogo cp={{ kind: "person", name: b.accountName }} />}
+                      title={b.bankName ?? "Bank"}
+                      sub={b.status === "REJECTED" && b.rejectionReason ? b.rejectionReason : bankLabel(b)}
+                      end={
+                        st ? (
+                          <Stat tone={st.tone} className="font-sans">
+                            {st.label}
+                          </Stat>
+                        ) : (
+                          cur?.id === b.id && <Stat className="font-sans">Selected</Stat>
+                        )
+                      }
+                    />
+                  );
+                })
+              ) : (
+                <Empty>None yet</Empty>
+              )}
+            </ListPanel>
+            <SectionTitle>Or add new</SectionTitle>
+            <Button size="lg" onClick={openAddBank}>
+              <Plus /> Add bank account
+            </Button>
+          </div>
+        </Pad>
+      )}
     </>
   );
 }

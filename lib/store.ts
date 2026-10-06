@@ -1,8 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { Tab } from "./config";
-import { eligible, defaultFor, type DB, type ExchangeMethod, type Payee, type Quote, type User } from "./backend";
+import type { Provider } from "./config";
+import type { DB } from "./backend";
 
 /* Client-side state persisted to localStorage (stand-in for the backend). */
 
@@ -25,16 +25,16 @@ export const ls = {
 export type Draft = {
   incur: "USDT" | "LKR";
   amount: string;
-  payee: Record<Tab, string | null>;
-  /** Exchange method chosen in the composer. */
-  account: string | null;
-  q: Quote | null;
+  /** Exchange whose pay app the USDT comes from. */
+  provider: Provider;
+  /** Payout bank account (CeyFi bank id); the default when unset. */
+  bankId: string | null;
 };
 
 const DB_KEYS = ["user", "kyc", "methods", "payees", "tx", "recurring", "billers", "waitlist", "defaultId", "names"] as const;
 
 const emptyDb = (): DB => ({ user: null, kyc: "not_started", methods: [], payees: [], tx: [], recurring: [], billers: [], waitlist: null, defaultId: null, names: {} });
-const emptyDraft = (): Draft => ({ incur: "USDT", amount: "", payee: { sell: null, send: null }, account: null, q: null });
+const emptyDraft = (): Draft => ({ incur: "USDT", amount: "", provider: "binance", bankId: null });
 
 const state = { version: -1, db: emptyDb(), draft: emptyDraft() };
 const listeners = new Set<() => void>();
@@ -43,8 +43,8 @@ function load() {
   if (state.version >= 0) return;
   const d = state.db;
   for (const k of DB_KEYS) (d as Record<string, unknown>)[k] = ls.get(k, d[k]);
-  // Drop demo-era bill data: bill payments not backed by the API, and the old simulated bill autopay.
-  const tx = d.tx.filter((t) => t.kind !== "bill" || !!t.payment_id);
+  // Drop demo-era data: transactions not backed by the API, and the old simulated bill autopay.
+  const tx = d.tx.filter((t) => !!t.payment_id);
   const recurring = d.recurring.filter((r) => (r.type as string) !== "bill");
   if (tx.length !== d.tx.length || recurring.length !== d.recurring.length) {
     Object.assign(d, { tx, recurring });
@@ -72,16 +72,14 @@ export function patchDraft(p: Partial<Draft>) {
   Object.assign(state.draft, p);
 }
 
-/** Returning users of the demo sign-in, keyed by phone or email. */
-export const knownUser = {
-  get: (id: string) => ls.get<Omit<User, "providers" | "since"> | null>("known_" + id, null),
-  set: (id: string, u: Omit<User, "providers" | "since">) => ls.set("known_" + id, u),
-};
+/** The whole store, readable outside React (event handlers, effects). */
+export const currentDb = () => (load(), state.db);
 
-/** True once a user has signed in. Readable outside React, e.g. in event handlers. */
-export const signedIn = () => (load(), !!state.db.user);
+/** The signed-in user, readable outside React, e.g. in event handlers. */
+export const currentUser = () => (load(), state.db.user);
+export const signedIn = () => !!currentUser();
 
-/** Sign out and clear that user's data, so a signed-out visitor never sees it. Returning users stay known. */
+/** Clear the signed-in user's data, so a signed-out visitor never sees it. Ending the Privy session is the caller's job. */
 export function signOut() {
   state.db = emptyDb();
   state.draft = emptyDraft();
@@ -114,14 +112,3 @@ export function useApp() {
   );
   return { ready: v >= 0, db: state.db, draft: state.draft };
 }
-
-/* ---------- selectors ---------- */
-export const activeEx = (db: DB, draft: Draft): ExchangeMethod | null => {
-  const l = eligible(db, "sell") as ExchangeMethod[];
-  return l.find((m) => m.id === draft.account) || (defaultFor(db, "sell") as ExchangeMethod | null);
-};
-export const payeesFor = (db: DB, tab: Tab) => db.payees.filter((p) => (tab === "sell" ? p.is_self : !p.is_self));
-export const activePayee = (db: DB, draft: Draft, tab: Tab): Payee | null => {
-  const l = payeesFor(db, tab);
-  return l.find((p) => p.id === draft.payee[tab]) || l[0] || null;
-};

@@ -124,7 +124,8 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply min-h-screen bg-canvas font-sans text-[15px] text-fg antialiased;
+    /* relative: Base UI backdrops use position:absolute on iOS 26+ Safari to cover the whole viewport. */
+    @apply relative min-h-screen bg-canvas font-sans text-[15px] text-fg antialiased;
   }
   button {
     @apply cursor-pointer;

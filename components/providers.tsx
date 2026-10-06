@@ -1,5 +1,6 @@
 "use client";
 
+import { PrivyProvider } from "@privy-io/react-auth";
 import { QueryClient, QueryClientProvider, isServer } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { isClientError } from "@/lib/api/client";
@@ -22,5 +23,17 @@ let browserClient: QueryClient | undefined;
 const getQueryClient = () => (isServer ? makeQueryClient() : (browserClient ??= makeQueryClient()));
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <PrivyProvider
+      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
+      clientId={process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID || undefined}
+      config={{
+        // Also enable these in the Privy dashboard (Login methods).
+        loginMethods: ["email", "google", "apple"],
+        appearance: { theme: "dark", accentColor: "#1c6ef5" },
+      }}
+    >
+      <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>
+    </PrivyProvider>
+  );
 }

@@ -1,16 +1,14 @@
 /* =====================================================================
-   Mock backend. The in-browser DB stands in for Clerk (auth), Pay&Go
-   (cards), LankaClear JustPay (bank debits) and CeyPay Direct
-   Debit + Offramp (exchanges → LKR). Replace these with API calls to go live.
+   In-browser DB. Sell and bill payments mirror the API; cards (Pay&Go), JustPay
+   bank debits, exchange accounts and recurring reloads are still demo-only.
    ===================================================================== */
-import { CFG, PNAME, bankShort, type Provider } from "./config";
+import { PNAME, bankShort, type Provider } from "./config";
 import type { Biller } from "./api/bills";
-import { mask, uid } from "./format";
-import { rate } from "./fx";
+import { uid } from "./format";
 
-export type Kyc = "not_started" | "verified";
-export type SignInVia = "google" | "apple" | "binance" | "phone" | "email";
-export type User = { name: string; email: string; phone: string; via: SignInVia; providers: SignInVia[]; since: number };
+export type Kyc = "not_started" | "pending" | "failed" | "verified";
+/** The signed-in user, mirrored from the backend (`/ceyfi/user/me`) and Privy. */
+export type User = { id: string; privyId: string; name: string; email: string; phone: string; since: number };
 
 /* ---------- payment methods ---------- */
 
@@ -83,6 +81,8 @@ export type TxState =
   | "rate_changed"
   | "refund_requested"
   | "payout_failed"
+  /** Waiting on a person: a large payout awaiting approval, or a bank reply being checked. */
+  | "in_review"
   | "charge_failed"
   | "failed";
 export type Tx = {
@@ -109,6 +109,9 @@ export type Tx = {
   purpose?: string;
   payee?: { name: string; nickname?: string; bank: string; account: string; self?: boolean; relationship?: string };
   bank_ref?: string;
+  /** Sells: CeyPay's reference for the bank transfer (CFY…), and the sale's payment number. */
+  transfer_ref?: string;
+  ref?: string;
   message?: string;
   /** Bill payments: the server payment this mirrors. Its state comes from the backend, not the demo engine. */
   payment_id?: string;
@@ -120,12 +123,12 @@ export type Tx = {
   _p0?: number;
 };
 
-export const LIVE: TxState[] = ["charging", "converting", "paying_out", "processing"];
+export const LIVE: TxState[] = ["charging", "converting", "paying_out", "processing", "in_review"];
 export const isLive = (s: TxState) => LIVE.includes(s);
 export const stLabel = (s: string) =>
   (
     ({
-      charging: "Collecting",
+      charging: "Awaiting payment",
       converting: "Converting",
       paying_out: "Paying out",
       processing: "Processing",
@@ -133,6 +136,7 @@ export const stLabel = (s: string) =>
       rate_changed: "Needs your OK",
       refund_requested: "Refund requested",
       payout_failed: "Payout failed",
+      in_review: "In review",
       charge_failed: "Failed",
       failed: "Failed",
     }) as Record<string, string>
@@ -179,7 +183,8 @@ export function nextRun(x: Recurring) {
 
 /* ---------- saved billers ---------- */
 
-export type SavedBiller = { id: string; code: string; account: string; created: number };
+/** A biller account to pay again. Signed in: from /ceyfi/billers. Guests: kept in the browser (`db.billers`). */
+export type SavedBiller = { id: string; code: string; account: string; nickname?: string | null; created: number };
 
 export const billerCp = (b: Pick<Biller, "id" | "name">): Counterparty => ({ kind: "biller", code: b.id, name: b.name, key: b.id });
 
@@ -219,16 +224,6 @@ export const txVia = (db: DB, t: Tx) => {
 
 /* ---------- quotes & engine (mock CeyPay DD + Offramp) ---------- */
 
-export type Quote = { gross_usdt: number; fees_usdt: number; rate: number; lkr_out: number; at: number };
-
-export function quote(usdt: number, lkrWant?: number): Quote {
-  const r = rate(),
-    keep = 1 - CFG.fee_pct / 100;
-  const gross = lkrWant ? Math.ceil((lkrWant / r / keep) * 100) / 100 : Math.round(usdt * 100) / 100;
-  const net = gross * keep;
-  return { gross_usdt: gross, fees_usdt: Math.round((gross - net) * 100) / 100, rate: r, lkr_out: Math.floor(net * r * 100) / 100, at: Date.now() };
-}
-
 const counted = (t: Tx) => !!t.usdt && !/charge_failed|^failed$/.test(t.state);
 export const spentBy = (db: DB, id: string, days: number) =>
   db.tx.filter((t) => t.method_id === id && counted(t) && t.created > Date.now() - days * 864e5).reduce((s, t) => s + (t.usdt || 0), 0);
@@ -242,53 +237,11 @@ export function newTx(db: DB, o: Omit<Tx, "id" | "created">): Tx {
   return t;
 }
 
-export function createTransfer(
-  db: DB,
-  { payee, account, q, purpose, simulateDrop }: { payee: Payee; account: ExchangeMethod; q: Quote; purpose: string; simulateDrop?: boolean },
-): { error: string; requote?: boolean } | { tx: Tx } {
-  if (db.kyc !== "verified") return { error: "Verify your identity first" };
-  if (q.gross_usdt < CFG.min_usdt) return { error: `The minimum is ${CFG.min_usdt} USDT` };
-  if (daySpent(db) + q.gross_usdt > CFG.daily_limit_usdt) return { error: `This would exceed your daily limit of ${CFG.daily_limit_usdt} USDT` };
-  if (q.gross_usdt > account.per_txn_limit || spentBy(db, account.id, 30) + q.gross_usdt > account.monthly_limit)
-    return { error: "This is above the limits on this exchange account." };
-  const fresh = quote(q.gross_usdt);
-  if (fresh.lkr_out < q.lkr_out * (1 - CFG.tol_pct / 100)) return { error: "The rate just moved. Please review the new amount.", requote: true };
-  const name = payee.nickname || payee.account_name;
-  const tx = newTx(db, {
-    kind: payee.is_self ? "sell" : "remit",
-    cp: payee.is_self ? { kind: "sell", name: "Sold USDT", key: "sell" } : { kind: "person", name, key: "p:" + payee.id },
-    method_id: account.id,
-    state: "charging",
-    usdt: q.gross_usdt,
-    fees_usdt: q.fees_usdt,
-    quoted_lkr: q.lkr_out,
-    quote_rate: q.rate,
-    purpose,
-    payee: {
-      name: payee.account_name,
-      nickname: payee.nickname,
-      bank: payee.bank_name,
-      account: mask(payee.account_number),
-      self: payee.is_self,
-      relationship: payee.relationship,
-    },
-    _fail: payee.account_number.endsWith("0000"),
-    _drop: simulateDrop,
-  });
-  return { tx };
-}
-
-/** Bill paid in USDT from an exchange account: collect USDT → convert → Pay&Go → biller. */
-export function advance(t: Tx, act?: "accept" | "refund"): Tx {
+/** Moves a demo (not API-backed) transaction along. Only mobile reloads remain demo; everything with a payment_id follows the server. */
+export function advance(t: Tx): Tx {
   if (t.payment_id) return t;
   if (["completed", "payout_failed", "charge_failed", "refund_requested", "failed"].includes(t.state)) return t;
-  if (act === "refund" && t.state === "rate_changed") {
-    t.state = "refund_requested";
-    t.message = "Refund requested. Support will return your USDT to the exchange account.";
-    return t;
-  }
   const dt = Date.now() - (t._t0 ?? 0);
-  // Bill payments never get here: they carry a payment_id and follow the server.
   if (t.kind === "reload") {
     if (dt > 1600) {
       if (t._fail) {
@@ -300,35 +253,6 @@ export function advance(t: Tx, act?: "accept" | "refund"): Tx {
       }
     }
     return t;
-  }
-  if (t.state === "charging" && dt > 1100) t.state = "converting";
-  if (t.state === "converting" || (t.state === "rate_changed" && act === "accept")) {
-    const q = quote(t.usdt || 0);
-    const quoted = t.quoted_lkr || 0;
-    if (t._drop && act !== "accept") {
-      q.lkr_out = Math.floor(quoted * 0.97 * 100) / 100;
-      q.rate = Math.round((t.quote_rate || 0) * 0.97 * 100) / 100;
-      delete t._drop;
-    }
-    if (q.lkr_out < quoted * (1 - CFG.tol_pct / 100) && act !== "accept") {
-      t.state = "rate_changed";
-      t.new_lkr = q.lkr_out;
-      t.new_rate = q.rate;
-    } else {
-      t.state = "paying_out";
-      t.rate = t.new_rate || q.rate;
-      t.lkr = t.new_lkr || q.lkr_out;
-      t._p0 = Date.now();
-    }
-  }
-  if (t.state === "paying_out" && Date.now() - (t._p0 ?? 0) > 1800) {
-    if (t._fail) {
-      t.state = "payout_failed";
-      t.message = "The recipient bank rejected the transfer: account closed or invalid.";
-    } else {
-      t.state = "completed";
-      t.bank_ref = "CEFT" + Math.floor(1e9 + Math.random() * 9e9);
-    }
   }
   return t;
 }
@@ -356,43 +280,3 @@ export const luhn = (n: string) => {
 };
 export const brandOf = (n: string): CardBrand | null =>
   /^4/.test(n) ? "visa" : /^(5[1-5]|2(2[2-9]|[3-6]\d|7[01]|720))/.test(n) ? "mastercard" : /^3[47]/.test(n) ? "amex" : null;
-
-/* ---------- sample data ---------- */
-
-export function seed(db: DB) {
-  const now = Date.now(),
-    D = 864e5,
-    name = db.user?.name || "";
-  const c1: CardMethod = { id: uid("pm_"), type: "card", brand: "visa", brandName: "Visa", funding: "Credit", last4: "7892", exp: "09/28", holder: name, billing: "71/2, Kesbewa", issuer: "Commercial Bank", created: now - 200 * D };
-  const c2: CardMethod = { id: uid("pm_"), type: "card", brand: "mastercard", brandName: "Mastercard", funding: "Debit", last4: "6322", exp: "08/26", holder: name, billing: "71/2, Kesbewa", issuer: "Sampath Bank", created: now - 300 * D };
-  const j1: JustPayMethod = { id: uid("pm_"), type: "justpay", bank: "Sampath Bank PLC", bank_code: 7278, last4: "4410", mobile: "0771234567", limit: 100000, created: now - 120 * D };
-  const e1: ExchangeMethod = { id: uid("pm_"), type: "exchange", provider: "binance", label: "Main", per_txn_limit: 500, monthly_limit: 2000, created: now - 90 * D };
-  const e2: ExchangeMethod = { id: uid("pm_"), type: "exchange", provider: "bybit", label: "Trading", per_txn_limit: 300, monthly_limit: 1000, created: now - 40 * D };
-  db.methods = [e1, j1, c1, c2, e2];
-  db.defaultId = j1.id;
-  db.kyc = "verified";
-
-  const own: Payee = { id: uid("pay_"), is_self: true, bank_code: 7278, bank_name: "Sampath Bank PLC", account_number: "123456789012", account_name: name, nickname: "My Sampath", relationship: "Self", mobile: null };
-  const amma: Payee = { id: uid("pay_"), is_self: false, bank_code: 7010, bank_name: "Bank of Ceylon", account_number: "8800112233", account_name: "K A Perera", nickname: "Amma", relationship: "Parent", mobile: "0771112233" };
-  db.payees = [own, amma];
-
-  const r2: Recurring = { id: uid("rc_"), type: "reload", name: "Dialog reload", cp: { kind: "biller", code: "Dialog", name: "Dialog", key: "DIALOG_RL" }, plan: "Monthly · 077 123 4567", account: "0771234567", amount: 500, freq: "monthly", day: 1, method_id: c1.id, status: "active", created: now - 150 * D };
-  const r3: Recurring = { id: uid("rc_"), type: "remit", name: "Amma", cp: { kind: "person", name: "Amma", key: "p:" + amma.id }, plan: "Monthly · Family support", payee_id: amma.id, amount: 25000, freq: "monthly", day: 28, method_id: e1.id, purpose: "Family support", status: "active", created: now - 80 * D };
-  db.recurring = [r2, r3];
-  // Bills come from the live API only: no sample billers or bill payments.
-  db.billers = [];
-
-  const T = (days: number, o: Omit<Tx, "id" | "created" | "state"> & { state?: TxState }): Tx => ({ id: txId(o.kind), created: now - days * D, state: "completed", ...o });
-  const sold = { kind: "sell", name: "Sold USDT", key: "sell" } as const;
-  const toSelf = { name, bank: "Sampath Bank PLC", account: "•••9012", self: true };
-  const toAmma = { name: "K A Perera", nickname: "Amma", bank: "Bank of Ceylon", account: "•••2233", relationship: "Parent" };
-  db.tx = [
-    T(3, { kind: "sell", cp: sold, method_id: e1.id, usdt: 100, fees_usdt: 1.5, rate: 326.5, lkr: 32160.25, payee: toSelf, bank_ref: "CEFT2339591087" }),
-    T(6, { kind: "remit", cp: r3.cp, method_id: e1.id, usdt: 77.76, fees_usdt: 1.17, rate: 327, lkr: 25045.4, purpose: "Family support", payee: toAmma, bank_ref: "CEFT1769562825", recurring_id: r3.id }),
-    T(24, { kind: "reload", cp: r2.cp, method_id: c1.id, lkr: 500, fee_lkr: 0, account: "0771234567", biller_ref: "PG190023841", recurring_id: r2.id }),
-    T(36, { kind: "remit", cp: r3.cp, method_id: e1.id, usdt: 77.52, fees_usdt: 1.16, rate: 328, lkr: 25046.1, purpose: "Family support", payee: toAmma, bank_ref: "CEFT9921834401", recurring_id: r3.id }),
-    T(45, { kind: "sell", cp: sold, method_id: e2.id, usdt: 250, fees_usdt: 3.75, rate: 325, lkr: 80031.25, payee: toSelf, state: "payout_failed", message: "The recipient bank rejected the transfer: account under review." }),
-    T(55, { kind: "reload", cp: r2.cp, method_id: c1.id, lkr: 500, fee_lkr: 0, account: "0771234567", biller_ref: "PG110293847", recurring_id: r2.id }),
-  ];
-}
-

@@ -1,109 +1,78 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, Checkbox, ErrorBox, Field, Kv, PageHead, Pad, Panel, col, fine, selectCls } from "../ui";
+import { Button, Checkbox, ErrorBox, Kv, PageHead, Pad, Panel, col, fine } from "../ui";
 import { cn } from "cn";
-import { CFG, type Tab } from "@/lib/config";
-import { fmt, lkr, mask } from "@/lib/format";
-import { createTransfer, mName, quote } from "@/lib/backend";
-import { activeEx, activePayee, commit, patchDraft, useApp } from "@/lib/store";
+import { PNAME } from "@/lib/config";
+import { fmt, lkr } from "@/lib/format";
+import { bankLabel } from "@/lib/api/sell";
+import { useSellReview } from "@/hooks/sell";
+import { SellStatusView } from "./status";
 import { tradeUrl } from "@/lib/params";
 
-export function Review({ tab, onBack }: { tab: Tab; onBack: () => void }) {
-  const router = useRouter();
-  const { db, draft } = useApp();
-  const q = draft.q,
-    p = activePayee(db, draft, tab),
-    a = activeEx(db, draft);
-  const invalid = !q || !p || !a || db.kyc !== "verified";
-
+/** Confirm the sale, then create it and hand its id to `onPlaced` (the checkout/status screen). */
+export function Review({ onBack, onPlaced }: { onBack: () => void; onPlaced: (id: string) => void }) {
+  const { quote, q, bank, provider, create, invalid, confirm } = useSellReview();
   const [agreed, setAgreed] = useState(false);
-  const [purpose, setPurpose] = useState(CFG.purposes[0]);
-  const [sim, setSim] = useState(false);
-  const [err, setErr] = useState("");
-  // Set in the same batch as the transfer, so clearing the draft doesn't trip the guard below.
-  const [placed, setPlaced] = useState(false);
 
   // Nothing to review (e.g. a reload on ?step=review): back to the composer.
   useEffect(() => {
-    if (invalid && !placed) onBack();
-  }, [invalid, placed, onBack]);
-  if (invalid || placed) return null;
+    if (invalid) onBack();
+  }, [invalid, onBack]);
+  // Placed: show its checkout right here. `onPlaced` also moves the URL to the status step (for reloads and Back),
+  // but this screen doesn't wait on that, so it never sits blank between the two.
+  if (create.data) return <SellStatusView id={create.data.id} />;
+  if (invalid || !q || !bank) return null;
 
-  const sell = tab === "sell";
-
-  const confirm = () => {
-    const r = commit((db) => createTransfer(db, { payee: p, account: a, q, purpose: sell ? "Savings" : purpose, simulateDrop: sim }))!;
-    if ("error" in r) {
-      setErr(r.error);
-      if (r.requote)
-        setTimeout(() => {
-          setErr("");
-          commit((_, d) => void (d.q = quote(q.gross_usdt)));
-        }, 1200);
-      return;
-    }
-    setPlaced(true);
-    patchDraft({ amount: "", q: null });
-    router.push("/activity/" + r.tx.id);
-  };
+  const via = `${PNAME[provider]} Pay`;
 
   return (
     <>
-      <PageHead title={sell ? "Review sale" : "Review transfer"} back={tradeUrl({ tab })} />
+      <PageHead title="Review sale" back={tradeUrl({ tab: "sell" })} />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <Panel className="text-center">
-            <div className={fine}>{sell ? "You receive" : "They receive"}</div>
-            <div className="font-mono text-4xl font-medium tracking-[-1px] text-ink">{lkr(q.lkr_out)}</div>
-            <div className={fine}>for {fmt(q.gross_usdt)} USDT</div>
+            <div className={fine}>You receive</div>
+            <div className={cn("font-mono text-4xl font-medium tracking-[-1px] text-ink", quote.isFetching && "opacity-60")}>{lkr(Number(q.lkrPayoutAmount))}</div>
+            <div className={fine}>for {fmt(Number(q.usdtAmount))} USDT</div>
           </Panel>
           <Panel className="py-1.5">
-            <Kv label={sell ? "You sell" : "You send"}>
-              <span className="font-mono">{fmt(q.gross_usdt)} USDT</span>
+            <Kv label="You sell">
+              <span className="font-mono">{fmt(Number(q.usdtAmount))} USDT</span>
             </Kv>
-            <Kv label={`Fees (exchange + CeyPay, ~${CFG.fee_pct}%)`}>
-              <span className="font-mono">− {fmt(q.fees_usdt)} USDT</span>
+            <Kv label={`Fees (exchange ${q.fees.exchangeFeePercentage}% + CeyPay ${q.fees.ceypayFeePercentage}%)`}>
+              <span className="font-mono">− {fmt(Number(q.fees.totalFeeUsdt))} USDT</span>
             </Kv>
-            <Kv label="Rate · CeylonCash FX">
-              <span className="font-mono">1 USDT = LKR {fmt(q.rate)}</span>
+            <Kv label="Rate">
+              <span className="font-mono">1 USDT = LKR {fmt(Number(q.rate))}</span>
             </Kv>
             <Kv label="Bank payout fee">Free</Kv>
-            <Kv label="Rate protection">Within {CFG.tol_pct}%</Kv>
           </Panel>
           <Panel className="py-1.5">
-            <Kv label="From">{mName(a)}</Kv>
-            <Kv label="To">{p.account_name}</Kv>
-            <Kv label="Bank">
-              {p.bank_name} {mask(p.account_number)}
-            </Kv>
-            {!sell && (
-              <>
-                <Kv label="Relationship">{p.relationship}</Kv>
-                <Field id="pu" label="Purpose of transfer" className="mt-2.5 mb-2">
-                  <select className={selectCls} id="pu" value={purpose} onChange={(e) => setPurpose(e.target.value)}>
-                    {CFG.purposes.map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </Field>
-              </>
-            )}
+            <Kv label="Pay with">{via}</Kv>
+            <Kv label="To">{bank.accountName}</Kv>
+            <Kv label="Bank">{bankLabel(bank)}</Kv>
           </Panel>
           <Checkbox checked={agreed} onChange={setAgreed}>
-            {sell
-              ? "I confirm this USDT is mine and from a lawful source, and that the bank account is in my name."
-              : "I confirm the funds are mine and from a lawful source, that I know the recipient, and that the purpose is correct."}
+            I confirm this USDT is mine and from a lawful source, and that the bank account is in my name.
           </Checkbox>
-          <Button size="lg" className="mt-3.5" disabled={!agreed} onClick={confirm}>
-            {sell ? "Confirm sale" : "Confirm and send"}
+          <Button
+            size="lg"
+            className="mt-3.5"
+            disabled={!agreed || create.isPending || quote.typing}
+            onClick={() => confirm((p) => onPlaced(p.id))}
+          >
+            {create.isPending ? (
+              <>
+                <Loader2 className="animate-spin" /> Creating payment
+              </>
+            ) : (
+              `Continue to ${via}`
+            )}
           </Button>
-          <p className={cn(fine, "mt-2.5 text-center")}>USDT is collected from {mName(a)} as soon as you confirm.</p>
-          {err && <ErrorBox>{err}</ErrorBox>}
-          <Checkbox checked={sim} onChange={setSim} className={cn(fine, "mt-5 opacity-80")}>
-            Demo: simulate a rate drop during this transfer
-          </Checkbox>
+          <p className={cn(fine, "mt-2.5 text-center")}>You’ll approve the exact USDT amount in {PNAME[provider]}. The rupees go to your bank as soon as it arrives.</p>
+          {create.error && <ErrorBox>{create.error.message}</ErrorBox>}
         </div>
       </Pad>
     </>

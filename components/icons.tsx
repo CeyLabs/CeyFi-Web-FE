@@ -9,6 +9,7 @@ import {
   Receipt,
   Send,
   Smartphone,
+  UserRound,
   Wallet,
 } from "lucide-react";
 
@@ -36,4 +37,5 @@ export const I = {
   bill: <Receipt />,
   phone: <Smartphone />,
   rates: <ChartLine />,
+  account: <UserRound />,
 };

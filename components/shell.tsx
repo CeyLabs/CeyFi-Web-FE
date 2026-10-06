@@ -1,20 +1,22 @@
 "use client";
 
+import { Toast as BaseToast } from "@base-ui/react/toast";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { LogIn } from "lucide-react";
 import { I, Logo } from "./icons";
 import { Soon } from "./ui";
 import { cn } from "cn";
 import { useApp } from "@/lib/store";
 import { initials } from "@/lib/format";
-import { loadFx } from "@/lib/fx";
-import { isExpired } from "@/lib/backend";
-import { onToast } from "@/lib/toast";
+import { toastManager } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
+import { RequireAuth } from "@/components/signin";
+import { ComingSoon } from "@/components/soon";
 import { BillTxSync } from "@/hooks/bills";
+import { SellTxSync } from "@/hooks/sell";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
 /** Which nav item is active: trade screens map to their tab, sub-routes to their parent. */
@@ -38,7 +40,6 @@ function Sidebar() {
   const top = useTop();
   const { db } = useApp();
   const u = db.user;
-  const alert = db.methods.some(isExpired);
   const nav = (href: string, key: string, text: ReactNode, icon: ReactNode, extra?: ReactNode) => (
     <Link className={sideLink} href={href} {...cur(top === key)}>
       {icon}
@@ -57,10 +58,16 @@ function Sidebar() {
       {nav("/", "home", "Home", I.home)}
       {nav("/activity", "activity", "Activity", I.activity)}
       {nav("/bills", "bills", "Bills", I.bill)}
-      {nav("/wallet", "wallet", "Wallet", I.wallet, alert && <span className="absolute right-3 size-[7px] rounded-full bg-err" title="Needs attention" />)}
       <div className="px-3 pt-[18px] pb-1.5 font-mono text-[11px] tracking-[.8px] text-muted uppercase max-lg:hidden">Move money</div>
       {nav(tradeUrl({ tab: "sell" }), "sell", "Sell USDT", I.sell)}
-      {nav(tradeUrl({ tab: "send" }), "send", "Send money", I.send)}
+      {nav(
+        tradeUrl({ tab: "send" }),
+        "send",
+        <>
+          Send money <Soon />
+        </>,
+        I.send,
+      )}
       {nav(
         tradeUrl({ tab: "buy" }),
         "buy",
@@ -116,20 +123,26 @@ function BottomNav() {
       <Link className={bottomLink} href="/bills" {...cur(top === "bills")}>
         {I.bill}Bills
       </Link>
-      <Link className={bottomLink} href="/wallet" {...cur(top === "wallet")}>
-        {I.wallet}Wallet
+      <Link className={bottomLink} href="/account" {...cur(top === "account")}>
+        {I.account}Account
       </Link>
     </nav>
   );
 }
 
-/** Master/detail selections (`/activity/:id`) keep the list's scroll position on wide screens. */
-const isSelection = (p: string) => /^\/(activity|recurring|wallet)\/(?!add|new)[^/]+$/.test(p);
+/** Master/detail selections (`/recurring/:id`, `/wallet/:id`) keep the list's scroll position on wide screens. */
+const isSelection = (p: string) => /^\/(recurring|wallet)\/(?!add|new)[^/]+$/.test(p);
+/** Activity details open in a sheet over the list, so moving within Activity never scrolls. */
+const inActivity = (p: string) => /^\/activity(\/|$)/.test(p);
 
 /** Replays the enter animation when switching sections. */
 function View({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const prev = useRef(pathname);
   useEffect(() => {
+    const within = inActivity(prev.current) && inActivity(pathname);
+    prev.current = pathname;
+    if (within) return;
     if (!isSelection(pathname) || matchMedia("(max-width:760px)").matches) scrollTo(0, 0);
   }, [pathname]);
   return (
@@ -139,13 +152,16 @@ function View({ children }: { children: ReactNode }) {
   );
 }
 
-/** App frame. Waits for localStorage state, then wraps every screen in the sidebar shell, signed in or not. */
+/** App frame. Waits for localStorage state, then wraps every screen in the sidebar shell. Non-public screens ask for sign-in. */
+/** Pages anyone can use without an account. Every other page asks for sign-in. */
+const PUBLIC = ["bills", "rates", "info"];
+/** Sections not backed by the API yet: [page title, feature name]. */
+const SOON: Record<string, [string, string]> = { wallet: ["Wallet", "Your wallet"], recurring: ["Recurring payments", "Recurring payments"] };
+const TITLES: Record<string, string> = { "": "Home", activity: "Activity", wallet: "Wallet", trade: "Move money", recurring: "Recurring payments", account: "Account" };
+
 export function Frame({ children }: { children: ReactNode }) {
   const { ready } = useApp();
-
-  useEffect(() => {
-    loadFx();
-  }, []);
+  const seg = usePathname().split("/")[1];
 
   if (!ready) return null;
 
@@ -154,40 +170,44 @@ export function Frame({ children }: { children: ReactNode }) {
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[76px_minmax(0,1fr)] lg:grid-cols-[252px_minmax(0,1fr)]">
         <Sidebar />
         <main className="min-w-0 pb-[calc(76px+env(safe-area-inset-bottom))] md:pb-0" aria-live="polite">
-          <View>{children}</View>
+          <View>
+            {PUBLIC.includes(seg) ? (
+              children
+            ) : (
+              <RequireAuth title={TITLES[seg] ?? "CeyPay"}>{SOON[seg] ? <ComingSoon title={SOON[seg][0]} what={SOON[seg][1]} /> : children}</RequireAuth>
+            )}
+          </View>
         </main>
       </div>
       <BottomNav />
       <BillTxSync />
+      <SellTxSync />
     </>
   );
 }
 
+/** Toast viewport (Base UI Toast), mounted once in the root layout. Shows the latest message above the bottom nav. */
 export function Toast() {
-  const [msg, setMsg] = useState("");
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    const off = onToast((m) => {
-      setMsg(m);
-      setOn(true);
-      clearTimeout(t);
-      t = setTimeout(() => setOn(false), 2200);
-    });
-    return () => {
-      off();
-      clearTimeout(t);
-    };
-  }, []);
   return (
-    <div
-      className={cn(
-        "pointer-events-none fixed bottom-[92px] left-1/2 z-[90] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas opacity-0 transition-opacity md:bottom-6",
-        on && "opacity-100",
-      )}
-      role="status"
-    >
-      {msg}
-    </div>
+    <BaseToast.Provider toastManager={toastManager} limit={1}>
+      <BaseToast.Portal>
+        <BaseToast.Viewport className="fixed bottom-[92px] left-1/2 z-[90] w-max max-w-[calc(100vw-32px)] -translate-x-1/2 md:bottom-6">
+          <ToastList />
+        </BaseToast.Viewport>
+      </BaseToast.Portal>
+    </BaseToast.Provider>
   );
+}
+
+function ToastList() {
+  const { toasts } = BaseToast.useToastManager();
+  return toasts.map((t) => (
+    <BaseToast.Root
+      key={t.id}
+      toast={t}
+      className="absolute bottom-0 left-1/2 w-max max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-4 py-2.5 text-sm text-canvas transition-[opacity,translate] duration-200 data-ending-style:translate-y-2 data-ending-style:opacity-0 data-limited:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0"
+    >
+      <BaseToast.Title />
+    </BaseToast.Root>
+  ));
 }

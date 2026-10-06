@@ -2,9 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { billerKeys, removeBiller, saveBiller, savedBillersQuery } from "@/lib/api/billers";
 import { billCheckQuery, billKeys, billPaymentQuery, billPhase, billersQuery, createBillPayment, isFinal, type BillPayment } from "@/lib/api/bills";
-import { isLive, type Tx } from "@/lib/backend";
-import { commit, useApp } from "@/lib/store";
+import { isLive, type SavedBiller, type Tx } from "@/lib/backend";
+import { uid } from "@/lib/format";
+import { commit, currentDb, currentUser, useApp } from "@/lib/store";
 
 /** All billers, mapped to our categories. */
 export function useBillers() {
@@ -17,11 +19,56 @@ export function useBiller(id: string | null | undefined) {
   return { ...q, biller: q.data };
 }
 
+/**
+ * Your saved billers: from the backend when signed in, from the browser for guests (paying stays anonymous).
+ * Billers saved in this browser before signing in stay here and are listed alongside the account's, so none go missing.
+ */
+export function useSavedBillers() {
+  const { db } = useApp();
+  const signedIn = !!db.user;
+  const q = useQuery({ ...savedBillersQuery(), enabled: signedIn });
+  const server = q.data ?? [];
+  const saved = signedIn ? [...server, ...db.billers.filter((l) => !server.some((s) => s.code === l.code && s.account === l.account))] : db.billers;
+  return { saved, isPending: signedIn && q.isPending, error: q.error };
+}
+
 /** Saved billers that still exist in the live catalog. Empty until the catalog loads. */
 export function useLiveSaved() {
-  const { db } = useApp();
+  const { saved } = useSavedBillers();
   const { data } = useBillers();
-  return data ? db.billers.filter((s) => data.some((b) => b.id === s.code)) : [];
+  return data ? saved.filter((s) => data.some((b) => b.id === s.code)) : [];
+}
+
+/** Saves a biller account (backend when signed in, browser for guests). Saving one that's already saved returns it. */
+export function useSaveBiller() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ billerId, account, nickname }: { billerId: string; account: string; nickname?: string | null }): Promise<SavedBiller> => {
+      if (currentUser()) return saveBiller({ billerId, accountNumber: account, nickname });
+      const local = commit((db) => {
+        const existing = db.billers.find((x) => x.code === billerId && x.account === account);
+        if (existing) return existing;
+        const s: SavedBiller = { id: uid("bl_"), code: billerId, account, nickname: nickname ?? null, created: Date.now() };
+        db.billers.unshift(s);
+        return s;
+      });
+      return local!;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: billerKeys.saved() }),
+  });
+}
+
+/** Removes a saved biller (backend when signed in, browser for guests). */
+export function useRemoveSavedBiller() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Browser entries (saved as a guest) are removed locally; the backend wouldn't know them.
+      if (currentUser() && !currentDb().billers.some((x) => x.id === id)) return removeBiller(id);
+      commit((db) => void (db.billers = db.billers.filter((x) => x.id !== id)));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: billerKeys.saved() }),
+  });
 }
 
 /** The biller's view of an account: whether it exists, the holder's name, the amount due (postpaid) and limits. */
@@ -79,7 +126,7 @@ function txFields(p: BillPayment): Partial<Tx> {
 
 /** Keeps a local Activity entry in step with its server payment while it's on screen. */
 export function useSyncBillTx(t: Tx | undefined) {
-  const { data } = useBillPayment(t?.payment_id);
+  const { data } = useBillPayment(t?.kind === "bill" ? t.payment_id : undefined);
   useEffect(() => {
     if (!t || !data) return;
     const next = txFields(data);
@@ -96,5 +143,5 @@ function SyncOne({ t }: { t: Tx }) {
 /** Mounted once in the app frame: keeps every in-flight bill payment in Activity up to date, wherever the user is. */
 export function BillTxSync() {
   const { db } = useApp();
-  return db.tx.filter((t) => t.payment_id && isLive(t.state)).map((t) => <SyncOne key={t.id} t={t} />);
+  return db.tx.filter((t) => t.kind === "bill" && t.payment_id && isLive(t.state)).map((t) => <SyncOne key={t.id} t={t} />);
 }

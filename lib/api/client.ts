@@ -1,3 +1,5 @@
+import { getAccessToken, getIdentityToken } from "@privy-io/react-auth";
+
 /* Thin fetch wrapper for the CeyPay backend. */
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
@@ -23,19 +25,43 @@ async function errorOf(res: Response) {
   return new ApiError(res.status, res.status >= 500 ? "Something went wrong on our side. Try again in a moment." : `Request failed (${res.status})`);
 }
 
-export async function api<T>(path: string, init?: Omit<RequestInit, "body"> & { body?: unknown }): Promise<T> {
+type Init = Omit<RequestInit, "body"> & {
+  body?: unknown;
+  /**
+   * Send the Privy access token, which authenticates the user. `"identity"` also sends the identity token, which the
+   * backend only uses to fill email/phone on the profile; fetching it can cost a Privy round trip, so only the sign-in sync asks for it.
+   */
+  auth?: boolean | "identity";
+};
+
+async function authHeaders(withIdentity: boolean): Promise<Record<string, string>> {
+  const [access, identity] = await Promise.all([getAccessToken(), withIdentity ? getIdentityToken() : null]);
+  if (!access) throw new ApiError(401, "Sign in to continue.");
+  return { Authorization: `Bearer ${access}`, ...(identity && { "privy-id-token": identity }) };
+}
+
+export async function api<T>(path: string, { auth, ...init }: Init = {}): Promise<T> {
+  const extra = auth ? await authHeaders(auth === "identity") : {};
   let res: Response;
   try {
     res = await fetch(API_URL + path, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-      body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+      headers: { "Content-Type": "application/json", ...extra, ...init.headers },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {
     throw new ApiError(0, "Can’t reach CeyPay. Check your connection and try again.");
   }
   if (!res.ok) throw await errorOf(res);
-  return res.json() as Promise<T>;
+  // 204s and empty bodies (DELETE, PATCH) have nothing to parse.
+  const text = await res.text();
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // e.g. an HTML page from a proxy, or an API URL pointing at the wrong server
+    throw new ApiError(res.status, "CeyPay sent an unexpected response. Try again in a moment.");
+  }
 }
 
 /** 4xx means the request itself is wrong, so retrying won't help. */

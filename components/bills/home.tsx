@@ -5,6 +5,7 @@ import { Plus, Search } from "lucide-react";
 import { TxRow } from "../activity";
 import { ButtonLink, Card, Empty, Legal, ListPanel, PageHead, Pad, SectionTitle, TitleLink, col, fine } from "../ui";
 import { CAT_ICON, CATS, SavedRow } from "./shared";
+import { cn } from "cn";
 import { useBillers, useLiveSaved } from "@/hooks/bills";
 import { lkr } from "@/lib/format";
 import { billsUrl } from "@/lib/params";
@@ -65,7 +66,7 @@ export function BillsHome() {
             <SectionTitle action={paid.length ? <TitleLink href={billsUrl({ step: "history" })}>See all</TitleLink> : null}>Recent payments</SectionTitle>
             <ListPanel className="flex flex-1 flex-col">
               {paid.length ? (
-                paid.slice(0, 4).map((t) => <TxRow key={t.id} db={db} t={t} compact />)
+                paid.slice(0, 4).map((t) => <TxRow key={t.id} db={db} t={t} />)
               ) : (
                 <Empty title="No bill payments yet" className={emptyFill}>
                   Bills you pay show up here.
@@ -96,7 +97,7 @@ export function SavedBillers() {
         }
       />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <ListPanel>
             {saved.length ? (
               saved.map((b) => <SavedRow key={b.id} db={db} b={b} detail />)
@@ -127,7 +128,7 @@ export function BillHistory() {
     <>
       <PageHead title="Bill payments" back={billsUrl()} backAlways />
       <Pad>
-        <div className={col}>
+        <div className={cn(col, "mx-auto")}>
           <div className="grid grid-cols-2 gap-2.5">
             <Card className={stat}>
               <div className={fine}>Paid this month</div>
@@ -139,7 +140,7 @@ export function BillHistory() {
             </Card>
           </div>
           <ListPanel className="mt-3">
-            {paid.length ? paid.map((t) => <TxRow key={t.id} db={db} t={t} compact />) : <Empty title="No bill payments yet" />}
+            {paid.length ? paid.map((t) => <TxRow key={t.id} db={db} t={t} />) : <Empty title="No bill payments yet" />}
           </ListPanel>
         </div>
       </Pad>

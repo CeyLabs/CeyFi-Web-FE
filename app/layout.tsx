@@ -3,7 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Suspense } from "react";
 import { Frame, Toast } from "@/components/shell";
-import { SignInDialog } from "@/components/signin";
+import { PrivyAuth } from "@/components/signin";
+import { AddBankDialog } from "@/components/account/add-bank";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -34,15 +35,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <Providers>
-          <NuqsAdapter>
-            <Suspense>
-              <Frame>{children}</Frame>
-            </Suspense>
-            <SignInDialog />
-            <Toast />
-          </NuqsAdapter>
-        </Providers>
+        {/* Base UI popups portal outside this root; isolating it keeps them above any z-index inside. */}
+        <div className="isolate">
+          <Providers>
+            <NuqsAdapter>
+              <Suspense>
+                <Frame>{children}</Frame>
+              </Suspense>
+              <PrivyAuth />
+              <AddBankDialog />
+              <Toast />
+            </NuqsAdapter>
+          </Providers>
+        </div>
       </body>
     </html>
   );

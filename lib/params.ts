@@ -1,4 +1,4 @@
-import { createParser, createSerializer, parseAsBoolean, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
+import { createParser, createSerializer, parseAsInteger, parseAsString, parseAsStringLiteral, type inferParserType } from "nuqs";
 import { BILL_CATS, type BillCat } from "./config";
 
 type Values<T extends Record<string, unknown>> = { [K in keyof T]?: T[K] | null };
@@ -17,7 +17,9 @@ export const parseAsReturnPath = createParser({
 export const tradeParams = {
   tab: parseAsStringLiteral(["sell", "send", "buy"] as const).withDefault("sell"),
   /** Sub-view on top of the composer. */
-  step: parseAsStringLiteral(["review", "payee"] as const),
+  step: parseAsStringLiteral(["review", "payee", "status"] as const),
+  /** Status: the sale (CeyFi payment id). */
+  id: parseAsString,
 };
 export type TradeTab = inferParserType<typeof tradeParams>["tab"];
 const tradeSer = createSerializer(tradeParams);
@@ -25,21 +27,25 @@ export const tradeUrl = (p: Values<inferParserType<typeof tradeParams>>) => trad
 
 export const accountParams = {
   /** Setup flow shown instead of the account overview. */
-  flow: parseAsStringLiteral(["verify", "payee"] as const),
+  flow: parseAsStringLiteral(["verify"] as const),
   /** Where to return once the flow is done. */
   ret: parseAsReturnPath,
-  /** Payee flow: adding your own bank account rather than a recipient. */
-  self: parseAsBoolean.withDefault(false),
 };
 const accountSer = createSerializer(accountParams);
 export const accountUrl = (p: Values<inferParserType<typeof accountParams>>) => accountSer("/account", p);
 
 /** Master/detail lists: free-text search. */
 export const searchParams = { q: parseAsString.withDefault("") };
-const activitySer = createSerializer(searchParams);
-export const activityUrl = (q?: string) => activitySer("/activity", { q: q || null });
-/** A transaction in Activity, keeping the list's search. */
-export const activityTxUrl = (id: string, q?: string) => activitySer(`/activity/${id}`, { q: q || null });
+/** Activity: status filter. */
+export const activityFilters = ["all", "progress", "done", "attention"] as const;
+export const activityParams = { ...searchParams, f: parseAsStringLiteral(activityFilters).withDefault("all"), p: parseAsInteger.withDefault(1) };
+type ActivityView = { q?: string; f?: (typeof activityFilters)[number]; p?: number };
+const activitySer = createSerializer(activityParams);
+const viewParams = ({ q, f, p }: ActivityView) => ({ q: q || null, f: f && f !== "all" ? f : null, p: p && p > 1 ? p : null });
+/** Activity, optionally searched (a string) or with the list's current search, filter and page. */
+export const activityUrl = (v: string | ActivityView = {}) => activitySer("/activity", viewParams(typeof v === "string" ? { q: v } : v));
+/** A transaction in Activity, keeping the list's search, filter and page. */
+export const activityTxUrl = (id: string, v: ActivityView = {}) => activitySer(`/activity/${id}`, viewParams(v));
 
 export const recurringTypes = ["reload", "remit"] as const;
 export const recNewParams = {

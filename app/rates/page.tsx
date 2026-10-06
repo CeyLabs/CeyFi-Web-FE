@@ -3,7 +3,8 @@
 import { FxBadge, PageHead, Pad, Panel, col, fine } from "@/components/ui";
 import { cn } from "cn";
 import { fmt } from "@/lib/format";
-import { FX_BASE, fxDate, useFx } from "@/lib/fx";
+import { FX_BASE, fxDate } from "@/lib/api/fx";
+import { useFx } from "@/hooks/fx";
 
 const titleCase = (s: string) =>
   s
