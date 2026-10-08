@@ -10,6 +10,7 @@ import { fmt, initials, lkr } from "@/lib/format";
 import { BANK_STATUS, bankLabel } from "@/lib/api/sell";
 import { useSellForm } from "@/hooks/sell";
 import { openAddBank } from "@/lib/add-bank";
+import { QuoteTimer } from "./quote-timer";
 
 const coin = "grid size-5 place-items-center rounded-full text-[10px] font-bold not-italic";
 export const CurUsdt = () => (
@@ -48,7 +49,7 @@ export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onR
   }, []);
 
   const u = incur === "USDT";
-  const go = () => (cta.addBank ? openAddBank() : cta.pick ? onPickBank() : onReview());
+  const go = () => (cta.refresh ? quote.refetch() : cta.addBank ? openAddBank() : cta.pick ? onPickBank() : onReview());
   const flip = () => {
     swap();
     input.current?.focus();
@@ -104,8 +105,14 @@ export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onR
             <span>{u ? C.outL : C.inL}</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <div className={cn(amountOut, quote.isFetching && "opacity-60")}>{q ? fmt(out) : "—"}</div>
-            <span className={cn(curChip, "ml-auto")}>{u ? <CurLkr /> : <CurUsdt />}</span>
+            {/* Keyed by the amount, so each new price settles in. */}
+            <div key={q ? out : ""} className={cn(amountOut, "transition-opacity motion-safe:animate-quote-in", quote.isFetching && "opacity-60")}>
+              {q ? fmt(out) : "—"}
+            </div>
+            <div className="ml-auto flex items-center gap-2.5">
+              <QuoteTimer quote={quote} />
+              <span className={curChip}>{u ? <CurLkr /> : <CurUsdt />}</span>
+            </div>
           </div>
         </div>
 
@@ -146,7 +153,10 @@ export function Composer({ onPickBank, onReview }: { onPickBank: () => void; onR
           {q ? (
             <>
               <span>
-                1 USDT = <span className="font-mono text-fg">LKR {fmt(Number(q.rate))}</span>
+                1 USDT ={" "}
+                <span key={q.rate} className="inline-block font-mono text-fg motion-safe:animate-quote-in">
+                  LKR {fmt(Number(q.rate))}
+                </span>
               </span>
               <span>
                 Fees <span className="font-mono text-fg">{fmt(Number(q.fees.totalFeeUsdt))} USDT</span>

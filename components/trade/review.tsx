@@ -9,6 +9,7 @@ import { fmt, lkr } from "@/lib/format";
 import { bankLabel } from "@/lib/api/sell";
 import { useSellReview } from "@/hooks/sell";
 import { SellStatusView } from "./status";
+import { QuoteTimer } from "./quote-timer";
 import { tradeUrl } from "@/lib/params";
 
 /** Confirm the sale, then create it and hand its id to `onPlaced` (the checkout/status screen). */
@@ -32,9 +33,15 @@ export function Review({ onBack, onPlaced }: { onBack: () => void; onPlaced: (id
       <PageHead title="Review sale" back={tradeUrl({ tab: "sell" })} />
       <Pad>
         <div className={cn(col, "mx-auto")}>
-          <Panel className="text-center">
+          <Panel className="relative text-center">
+            <QuoteTimer quote={quote} className="absolute top-3.5 right-3.5" />
             <div className={fine}>You receive</div>
-            <div className={cn("font-mono text-4xl font-medium tracking-[-1px] text-ink", quote.isFetching && "opacity-60")}>{lkr(Number(q.lkrPayoutAmount))}</div>
+            <div
+              key={q.lkrPayoutAmount}
+              className={cn("font-mono text-4xl font-medium tracking-[-1px] text-ink transition-opacity motion-safe:animate-quote-in", quote.isFetching && "opacity-60")}
+            >
+              {lkr(Number(q.lkrPayoutAmount))}
+            </div>
             <div className={fine}>for {fmt(Number(q.usdtAmount))} USDT</div>
           </Panel>
           <Panel className="py-1.5">
@@ -45,7 +52,9 @@ export function Review({ onBack, onPlaced }: { onBack: () => void; onPlaced: (id
               <span className="font-mono">− {fmt(Number(q.fees.totalFeeUsdt))} USDT</span>
             </Kv>
             <Kv label="Rate">
-              <span className="font-mono">1 USDT = LKR {fmt(Number(q.rate))}</span>
+              <span key={q.rate} className="inline-block font-mono motion-safe:animate-quote-in">
+                1 USDT = LKR {fmt(Number(q.rate))}
+              </span>
             </Kv>
             <Kv label="Bank payout fee">Free</Kv>
           </Panel>
@@ -60,7 +69,7 @@ export function Review({ onBack, onPlaced }: { onBack: () => void; onPlaced: (id
           <Button
             size="lg"
             className="mt-3.5"
-            disabled={!agreed || create.isPending || quote.typing}
+            disabled={!agreed || create.isPending || quote.typing || quote.expired}
             onClick={() => confirm((p) => onPlaced(p.id))}
           >
             {create.isPending ? (
