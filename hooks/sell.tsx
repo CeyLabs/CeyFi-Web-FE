@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   addBank,
@@ -16,10 +16,12 @@ import {
   sellMessage,
   sellQuoteQuery,
   sellState,
+  QUOTE_TTL,
   setDefaultBank,
   type QuoteInput,
   type SellPayment,
 } from "@/lib/api/sell";
+import { expiresAt } from "@/lib/api/bills";
 import { meQuery } from "@/lib/api/user";
 import type { DB, Tx } from "@/lib/backend";
 import type { Provider } from "@/lib/config";
@@ -27,6 +29,10 @@ import { lkr, toNum } from "@/lib/format";
 import { commit, patchDraft, useApp } from "@/lib/store";
 
 const POLL_MS = 3000;
+/** How often Activity checks on sales still in flight while you're elsewhere in the app. */
+const WATCH_MS = 10_000;
+/** How long past its checkout deadline an unpaid sale is still watched, giving the backend time to mark it expired. */
+const EXPIRY_GRACE_MS = 2 * 60_000;
 
 /** `value`, once it has stopped changing for `ms`. */
 function useDebounced<T>(value: T, ms = 400) {
@@ -53,13 +59,29 @@ export function useSellLimits() {
   });
 }
 
-/** A live quote for what the user typed, debounced. Keeps the last quote on screen while the next loads. */
+/**
+ * A live quote for what the user typed, debounced. Keeps the last quote on screen while the next loads.
+ * A quote holds for QUOTE_TTL (its staleTime), then re-prices on its own. `expired` means it has run out
+ * and no fresh one has landed yet: re-pricing, or that failed (it retries on the next interval or `refetch`).
+ */
 export function useSellQuote(input: QuoteInput) {
   const q = useDebounced(input);
   const typing = q.amount !== input.amount || q.inputCurrency !== input.inputCurrency || q.provider !== input.provider;
-  const query = useQuery({ ...sellQuoteQuery(q), enabled: q.amount > 0, placeholderData: (prev) => (input.amount > 0 ? prev : undefined) });
-  return { ...query, typing: typing && input.amount > 0 };
+  const query = useQuery({
+    ...sellQuoteQuery(q),
+    enabled: q.amount > 0,
+    placeholderData: (prev) => (input.amount > 0 ? prev : undefined),
+    // The interval restarts with each new quote; "always" so a screen opening on a cached quote gets a full window.
+    refetchInterval: QUOTE_TTL,
+    refetchOnMount: "always",
+    // The interval pauses in a hidden tab; re-price as soon as it's back (off by default app-wide).
+    refetchOnWindowFocus: true,
+  });
+  const own = !!query.data && !query.isPlaceholderData;
+  return { ...query, typing: typing && input.amount > 0, quotedAt: own ? query.dataUpdatedAt : 0, expired: own && query.isStale };
 }
+
+export type SellQuoteState = ReturnType<typeof useSellQuote>;
 
 /** The user's payout bank accounts, default first. The backend only allows this once identity is verified. */
 export function useBanks() {
@@ -107,7 +129,7 @@ export function useSelectedBank() {
 }
 
 /** What the sell button does next: the first unmet requirement wins. */
-export type SellCta = { label: string; dis?: boolean; addBank?: boolean; pick?: boolean; step?: string };
+export type SellCta = { label: string; dis?: boolean; addBank?: boolean; pick?: boolean; refresh?: boolean; step?: string };
 
 /**
  * The sell composer's state: the amount (typed in USDT or LKR), a live quote, the payout account, limits,
@@ -135,6 +157,8 @@ export function useSellForm() {
   if (!a) cta = { label: "Enter an amount", dis: true };
   else if (quote.isError && !quote.typing && !q) cta = { label: "Check the amount", dis: true, step: quote.error.message };
   else if (!q || quote.typing) cta = { label: "Getting the best rate", dis: true };
+  else if (quote.expired)
+    cta = quote.isFetching ? { label: "Getting a fresh rate", dis: true } : { label: "Refresh rate", refresh: true, step: "Rates move fast, so a quote holds for 30 seconds." };
   else if (banksPending) cta = { label: "Loading your bank accounts", dis: true };
   else if (!bank) cta = { label: "Add your bank account", addBank: true };
   else if (bank.status === "PENDING_REVIEW")
@@ -173,7 +197,8 @@ export function useSellReview() {
   const quote = useSellQuote(input);
   const { bank, isPending: banksPending } = useSelectedBank();
   const create = useCreateSell();
-  const invalid = !input.amount || quote.isError || (!banksPending && bank?.status !== "VERIFIED");
+  // A failed re-price keeps the old quote (shown as expired, with a retry) rather than leaving Review.
+  const invalid = !input.amount || (quote.isError && !quote.data) || (!banksPending && bank?.status !== "VERIFIED");
 
   return {
     quote,
@@ -205,6 +230,7 @@ export function useCreateSell() {
     onSuccess: (p) => {
       qc.setQueryData(sellKeys.payment(p.id), p);
       qc.invalidateQueries({ queryKey: meQuery().queryKey }); // today's limit moved
+      qc.invalidateQueries({ queryKey: sellKeys.activity() }); // so SellTxSync watches it
       commit((db) => upsertSellTx(db, p));
     },
   });
@@ -222,17 +248,33 @@ export function useSellPayment(id: string | null | undefined) {
   return q;
 }
 
-/** Mounted once in the app frame: mirrors the user's sales into Activity, refreshing while any is in flight. */
+/**
+ * Mounted once in the app frame: mirrors the user's sales into Activity. The list loads once (and again after
+ * a new sale); only the sales still in flight are polled, each on its own, until they settle.
+ */
 export function SellTxSync() {
   const { db } = useApp();
-  const { data } = useQuery({
-    ...sellActivityQuery(),
-    enabled: !!db.user,
-    refetchInterval: (q) => (q.state.data?.data.some((p) => !isFinalSell(p.status)) ? 10_000 : false),
-  });
+  const { data } = useQuery({ ...sellActivityQuery(), enabled: !!db.user });
   useMirror(data?.data);
+  const live = useQueries({
+    queries: (data?.data ?? []).filter((p) => !isFinalSell(p.status)).map((p) => ({ ...sellPaymentQuery(p.id), refetchInterval: watchInterval })),
+    combine: settledData,
+  });
+  useMirror(live);
   return null;
 }
+
+/** Polls a sale until it settles, or until an unpaid one is well past its checkout deadline (the backend should have expired it). */
+function watchInterval(q: { state: { data?: SellPayment } }) {
+  const p = q.state.data;
+  if (!p) return WATCH_MS;
+  if (isFinalSell(p.status)) return false;
+  const deadline = p.status === "AWAITING_PAYMENT" && p.checkout ? expiresAt(p.checkout) : null;
+  return deadline && Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
+}
+
+/** Module-level so useQueries memoizes it: a new array only when a sale actually changes. */
+const settledData = (rs: { data?: SellPayment }[]) => rs.flatMap((r) => (r.data ? [r.data] : []));
 
 function useMirror(list: SellPayment[] | undefined) {
   useEffect(() => {

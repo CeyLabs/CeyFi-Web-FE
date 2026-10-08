@@ -1,20 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftRight, CalendarCheck, CircleX, FileText, Hourglass, Landmark, LifeBuoy, Share, TriangleAlert, Wallet } from "lucide-react";
+import { ArrowLeftRight, CalendarCheck, CircleX, Hourglass, Landmark, Download, Loader2, TriangleAlert, Wallet } from "lucide-react";
 import { Alert, ButtonLink, CpLogo, DAct, DCard, DRow, DetailHead, LRow, PmIcon, Segmented, Sheet, Stat, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, fine } from "./ui";
 import { cn } from "cn";
 import { PayLogo } from "./pay-with";
-import { fmt, dLong, dShort, dTime, lkr } from "@/lib/format";
+import { fmt, dShort, dTime, lkr } from "@/lib/format";
 import { M, isLive, stLabel, txTitle, txVia, type DB, type Tx } from "@/lib/backend";
 import { useAdvance, type ActivityFilter } from "@/hooks/activity";
 import { useSyncBillTx } from "@/hooks/bills";
-import { activityParams, activityTxUrl, activityUrl, billsUrl, infoUrl, tradeUrl } from "@/lib/params";
+import { activityParams, activityTxUrl, activityUrl, billsUrl, tradeUrl } from "@/lib/params";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryStates } from "nuqs";
 import { useState, type ReactNode } from "react";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
+import { downloadReceipt } from "@/lib/receipt";
 
 /** History / Recurring switch shared by both Activity screens. */
 export function ActivityTabs({ on }: { on: "history" | "recurring" }) {
@@ -56,6 +57,17 @@ function PaidWith({ db, t }: { db: DB; t: Tx }) {
   );
 }
 
+/** How it was paid, compact: the pay partner's logo or the method's badge, named on hover. */
+function ViaIcon({ db, t }: { db: DB; t: Tx }) {
+  const m = M(db, t.method_id);
+  if (!m && t.provider) return <PayLogo provider={t.provider} small />;
+  return (
+    <span title={txVia(db, t)} className="inline-flex">
+      <PmIcon m={m} className="h-4 min-w-6 text-[8px]" />
+    </span>
+  );
+}
+
 /** One-column activity row, for phones and Home. `q`/`f` keep the list's search and filter. */
 export function TxRow({ db, t, selected, q, f, p }: { db: DB; t: Tx; selected?: boolean; q?: string; f?: ActivityFilter; p?: number }) {
   return (
@@ -67,7 +79,12 @@ export function TxRow({ db, t, selected, q, f, p }: { db: DB; t: Tx; selected?: 
       selected={selected}
       logo={<CpLogo cp={t.cp} />}
       title={txTitle(db, t)}
-      sub={`${dShort(t.created)} · ${txVia(db, t)}`}
+      sub={
+        <span className="inline-flex items-center gap-2">
+          {dShort(t.created)}
+          <ViaIcon db={db} t={t} />
+        </span>
+      }
       end={
         <span className="flex flex-col items-end gap-1">
           {amountCell(t)}
@@ -185,13 +202,13 @@ function Progress({ db, t }: { db: DB; t: Tx }) {
 export function TxDetail({ t }: { t: Tx }) {
   const { db } = useApp();
   const title = txTitle(db, t);
-  const same = db.tx.filter((x) => x.cp.key === t.cp.key).length;
   const fx = t.kind === "sell" || t.kind === "remit";
   const rec = t.recurring_id ? db.recurring.find((r) => r.id === t.recurring_id) : undefined;
   const live = isLive(t.state);
   useAdvance(t);
   useSyncBillTx(t);
 
+  // Renames apply to everything with the same counterparty; every sale shares one, so sales can't be renamed.
   const rename = () => {
     const n = prompt("Rename this", title);
     if (n === null) return;
@@ -200,16 +217,22 @@ export function TxDetail({ t }: { t: Tx }) {
       else delete db.names[t.cp.key];
     });
   };
-  const canShare = typeof navigator !== "undefined" && !!navigator.share;
-  const share = () => {
-    const s = `CeyPay ${t.id}: ${lkr(t.lkr)} · ${title} · ${dLong(t.created)}${t.bank_ref ? " · Bank ref " + t.bank_ref : ""}${t.biller_ref ? " · Ref " + t.biller_ref : ""}`;
-    if (canShare) navigator.share({ text: s }).catch(() => {});
-    else navigator.clipboard?.writeText(s).then(() => toast("Receipt copied"));
+  const done = t.state === "completed";
+  const [saving, setSaving] = useState(false);
+  const download = async () => {
+    setSaving(true);
+    try {
+      await downloadReceipt(db, t);
+    } catch {
+      toast("Couldn’t make the receipt. Try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <>
-      <DetailHead logo={<CpLogo cp={t.cp} big />} title={title} sub={dTime(t.created)} big={`${t.kind === "sell" ? "+" : ""}${lkr(t.lkr || t.quoted_lkr)}`} onRename={rename} />
+      <DetailHead logo={<CpLogo cp={t.cp} big />} title={title} sub={dTime(t.created)} big={`${t.kind === "sell" ? "+" : ""}${lkr(t.lkr || t.quoted_lkr)}`} onRename={t.kind === "sell" ? undefined : rename} />
       {fx && t.state !== "completed" && (
         <DCard className="p-4">
           <Progress db={db} t={t} />
@@ -324,17 +347,11 @@ export function TxDetail({ t }: { t: Tx }) {
           Recurring payment
         </DAct>
       )}
-      {t.state === "completed" && (
-        <DAct icon={<Share />} onClick={share}>
-          {canShare ? "Share receipt" : "Copy receipt"}
+      {done && (
+        <DAct icon={saving ? <Loader2 className="animate-spin" /> : <Download />} onClick={saving ? undefined : download}>
+          Download receipt
         </DAct>
       )}
-      <DAct icon={<LifeBuoy />} href={infoUrl("faq")} chevron>
-        Help
-      </DAct>
-      <DAct icon={<FileText />} href={activityUrl(title)} right={`${same} transaction${same === 1 ? "" : "s"}`} chevron>
-        History
-      </DAct>
     </>
   );
 }

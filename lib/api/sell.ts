@@ -151,12 +151,14 @@ export const sellKeys = {
   activity: () => [...sellKeys.all, "activity"] as const,
 };
 
+/** How long a quote holds. Rates move, so the sell screens re-price every time it runs out. */
+export const QUOTE_TTL = 30_000;
+
 export const sellQuoteQuery = (q: QuoteInput) =>
   queryOptions({
     queryKey: sellKeys.quote(q),
     queryFn: () => api<SellQuote>("/ceyfi/payment/quote", { method: "POST", auth: true, body: { ...q, provider: PROVIDER_CODE[q.provider] } }),
-    // Rates move; keep a quote for half a minute.
-    staleTime: 30_000,
+    staleTime: QUOTE_TTL,
   });
 
 export const banksQuery = () =>

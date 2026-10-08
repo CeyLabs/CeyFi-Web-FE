@@ -17,12 +17,13 @@ export const PROVIDERS: Provider[] = ["binance", "bybit", "kucoin"];
 const PM_LOGO: Record<Provider, string> = { binance: "/pay-methods/binance-pay", bybit: "/pay-methods/bybit-pay", kucoin: "/pay-methods/kucoin-pay" };
 
 /** A pay partner's logo (theme-aware), e.g. in Activity rows. */
-export function PayLogo({ provider, className }: { provider: Provider; className?: string }) {
+export function PayLogo({ provider, className, small }: { provider: Provider; className?: string; small?: boolean }) {
+  const h = small ? "h-2.5" : "h-4";
   return (
     <span className={cn("inline-flex items-center", className)} title={`${PNAME[provider]} Pay`}>
       {/* eslint-disable @next/next/no-img-element -- static SVG logos; next/image adds nothing here */}
-      <img src={`${PM_LOGO[provider]}-dark.svg`} alt={`${PNAME[provider]} Pay`} className="on-dark h-4 w-auto" />
-      <img src={`${PM_LOGO[provider]}.svg`} alt={`${PNAME[provider]} Pay`} className="on-light h-4 w-auto" />
+      <img src={`${PM_LOGO[provider]}-dark.svg`} alt={`${PNAME[provider]} Pay`} className={cn("on-dark w-auto", h)} />
+      <img src={`${PM_LOGO[provider]}.svg`} alt={`${PNAME[provider]} Pay`} className={cn("on-light w-auto", h)} />
       {/* eslint-enable @next/next/no-img-element */}
     </span>
   );
