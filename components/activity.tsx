@@ -57,6 +57,17 @@ function PaidWith({ db, t }: { db: DB; t: Tx }) {
   );
 }
 
+/** How it was paid, compact: the pay partner's logo or the method's badge, named on hover. */
+function ViaIcon({ db, t }: { db: DB; t: Tx }) {
+  const m = M(db, t.method_id);
+  if (!m && t.provider) return <PayLogo provider={t.provider} small />;
+  return (
+    <span title={txVia(db, t)} className="inline-flex">
+      <PmIcon m={m} className="h-4 min-w-6 text-[8px]" />
+    </span>
+  );
+}
+
 /** One-column activity row, for phones and Home. `q`/`f` keep the list's search and filter. */
 export function TxRow({ db, t, selected, q, f, p }: { db: DB; t: Tx; selected?: boolean; q?: string; f?: ActivityFilter; p?: number }) {
   return (
@@ -68,7 +79,12 @@ export function TxRow({ db, t, selected, q, f, p }: { db: DB; t: Tx; selected?: 
       selected={selected}
       logo={<CpLogo cp={t.cp} />}
       title={txTitle(db, t)}
-      sub={`${dShort(t.created)} · ${txVia(db, t)}`}
+      sub={
+        <span className="inline-flex items-center gap-2">
+          {dShort(t.created)}
+          <ViaIcon db={db} t={t} />
+        </span>
+      }
       end={
         <span className="flex flex-col items-end gap-1">
           {amountCell(t)}
@@ -192,6 +208,7 @@ export function TxDetail({ t }: { t: Tx }) {
   useAdvance(t);
   useSyncBillTx(t);
 
+  // Renames apply to everything with the same counterparty; every sale shares one, so sales can't be renamed.
   const rename = () => {
     const n = prompt("Rename this", title);
     if (n === null) return;
@@ -215,7 +232,7 @@ export function TxDetail({ t }: { t: Tx }) {
 
   return (
     <>
-      <DetailHead logo={<CpLogo cp={t.cp} big />} title={title} sub={dTime(t.created)} big={`${t.kind === "sell" ? "+" : ""}${lkr(t.lkr || t.quoted_lkr)}`} onRename={rename} />
+      <DetailHead logo={<CpLogo cp={t.cp} big />} title={title} sub={dTime(t.created)} big={`${t.kind === "sell" ? "+" : ""}${lkr(t.lkr || t.quoted_lkr)}`} onRename={t.kind === "sell" ? undefined : rename} />
       {fx && t.state !== "completed" && (
         <DCard className="p-4">
           <Progress db={db} t={t} />
