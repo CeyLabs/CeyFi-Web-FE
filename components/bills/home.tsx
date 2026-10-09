@@ -36,7 +36,7 @@ export function BillsHome() {
         </Link>
 
         <SectionTitle>Pay a bill</SectionTitle>
-        <div className="grid grid-cols-4 gap-2 sm:gap-2.5 lg:grid-cols-8">
+        <div className="grid grid-cols-4 gap-2 sm:gap-2.5 lg:grid-cols-9">
           {cats.map(([k, c]) => (
             <Link key={k} className={catTile} href={billsUrl({ step: "find", cat: k })}>
               <span className={catIcon}>{CAT_ICON[k]}</span>

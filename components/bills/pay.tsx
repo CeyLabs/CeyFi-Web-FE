@@ -34,14 +34,15 @@ import { BILL_CATS, EMAIL_RE, MOBILE_RE, PNAME, type Provider } from "@/lib/conf
 import { fmt, lkr, toNum } from "@/lib/format";
 import { useRate } from "@/hooks/fx";
 import { billerCp, lastPaid, newTx, txTitle } from "@/lib/backend";
-import { PROVIDER_CODE, billPhase, providerOf, type BillCheck, type Biller, type BillPayment } from "@/lib/api/bills";
+import { PROVIDER_CODE, billPhase, providerOf, type Biller, type BillPayment } from "@/lib/api/bills";
 import { isClientError } from "@/lib/api/client";
-import { useBillCheck, useBillPayment, useBiller, useCreateBillPayment, useRemoveSavedBiller, useSaveBiller, useSavedBillers, useSyncBillTx } from "@/hooks/bills";
+import { useBillPayment, useBiller, useCreateBillPayment, useRemoveSavedBiller, useSaveBiller, useSavedBillers, useSyncBillTx } from "@/hooks/bills";
 import { billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
-const QUICK = [2500, 5000, 10000];
+/** Round amounts to offer: small ones for reloads and wallets, bill-sized ones otherwise. */
+const quickFor = (b: Biller) => (b.cat === "mobile" || b.cat === "wallet" ? [100, 500, 1000] : [2500, 5000, 10000]);
 
 /** Amount and pay partner for one biller account, then a review sheet. */
 export function PayBill({ saved, code, acct }: { saved: string | null; code: string | null; acct: string | null }) {
@@ -56,10 +57,8 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   // A saved biller's id resolves once your saved list has loaded.
   const isPending = billerPending || (!!saved && mine.isPending);
   const error = billerError ?? (saved ? mine.error : null);
-  const check = useBillCheck(b?.id, account);
 
-  // Null until the user types: postpaid bills start from the amount due.
-  const [typed, setAmount] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
   const [picked, setPicked] = useState<Provider | null>(null);
   const [review, setReview] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -90,38 +89,19 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   // Default to the pay partner used for the last bill, else Binance.
   const provider = picked ?? db.tx.find((t) => t.kind === "bill" && t.provider)?.provider ?? "binance";
   const last = lastPaid(db, b.id, account);
-  const ok = check.data?.valid === true;
-  const due = ok ? check.data!.amount_due : null;
-  const holder = ok ? check.data!.customer_name : null;
-  // The account's own limits, when the biller gives them, beat the biller-wide ones.
-  const min = (ok && check.data!.min) || b.min,
-    max = (ok && check.data!.max) || b.max;
-  const amount = typed ?? (due ? String(due) : "");
+  const { min, max } = b;
   const a = toNum(amount);
   // Estimate only: the backend sets the exact USDT amount when it creates the payment.
   const usdt = a ? a / rate : 0;
-  // Shortcuts: the amount due, the last payment, then round amounts. First tag wins on duplicates.
-  const quick = [...(due ? ([[due, "Due"]] as const) : []), ...(last?.lkr ? ([[last.lkr, "Last"]] as const) : []), ...QUICK.map((v) => [v, ""] as const)]
-    .filter(([v], i, l) => v >= min && v <= max && l.findIndex(([w]) => w === v) === i);
+  // Shortcuts: the last payment, then round amounts. First tag wins on duplicates.
+  const quick = [...(last?.lkr ? ([[last.lkr, "Last"]] as const) : []), ...quickFor(b).map((v) => [v, ""] as const)].filter(
+    ([v], i, l) => v >= min && v <= max && l.findIndex(([w]) => w === v) === i,
+  );
 
   // Call-to-action: the first unmet requirement wins.
   let label: string,
-    dis = false,
-    step = "",
-    retry = false;
-  // Every account is checked with the biller first. Any amount in range can be paid, including part of a bill.
-  if (check.isPending) {
-    label = b.requiresCheck ? "Checking your bill" : "Checking account";
-    dis = true;
-  } else if (check.error) {
-    label = "Try again";
-    retry = true;
-    step = check.error.message;
-  } else if (!ok) {
-    label = "Account not found";
-    dis = true;
-    step = `${b.name} doesn’t recognise this ${b.accountLabel.toLowerCase()}. Check it against your bill.`;
-  } else if (!a) {
+    dis = false;
+  if (!a) {
     label = "Enter an amount";
     dis = true;
   } else if (a < min) {
@@ -132,7 +112,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
     dis = true;
   } else label = `Pay ${lkr(a)}`;
 
-  const go = () => (retry ? check.refetch() : setReview(true));
+  const go = () => setReview(true);
 
   return (
     <>
@@ -147,7 +127,11 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
             </div>
           </div>
 
-          <BillInfo b={b} account={account} check={check.data} pending={check.isPending} />
+          <DCard className="mt-0 mb-4">
+            <DRow label={b.accountLabel}>
+              <span className="font-mono">{account}</span>
+            </DRow>
+          </DCard>
 
           <div className={amountBox}>
             <label htmlFor="amt" className={amountLabel}>
@@ -161,11 +145,12 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
                 id="amt"
                 ref={input}
                 className={amountInput}
-                inputMode="decimal"
-                placeholder="0.00"
+                inputMode="numeric"
+                placeholder="0"
                 autoComplete="off"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                // Whole rupees only: MyReload doesn't take cents.
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !dis) go();
                 }}
@@ -191,7 +176,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
                 ))}
               </div>
             )}
-            {due ? <div className={cn(fine, "mt-2")}>You owe {lkr(due)}. You can pay part of it, or more in advance.</div> : null}
+            {b.cat !== "mobile" && b.cat !== "wallet" && <div className={cn(fine, "mt-2")}>Enter the amount on your bill. You can pay part of it, or more in advance.</div>}
           </div>
 
           <div className="mt-3 flex items-center justify-between">
@@ -215,7 +200,6 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
           <Button size="lg" className="mt-3.5" disabled={dis} onClick={go}>
             {label}
           </Button>
-          {step && <div className={cn(fine, "mt-2 text-center")}>{step}</div>}
           <RiskNote />
           {sb && (
             <button className={cn(fine, "mt-4 block w-full text-center hover:text-err", armed && "font-medium text-err")} onClick={remove}>
@@ -226,36 +210,9 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
       </Pad>
 
       <Sheet open={review && a > 0} onClose={() => setReview(false)} label="Review payment">
-        <Review b={b} account={account} holder={holder} lkrAmount={a} usdt={usdt} provider={provider} />
+        <Review b={b} account={account} lkrAmount={a} usdt={usdt} provider={provider} />
       </Sheet>
     </>
-  );
-}
-
-/** What the biller says about this account: holder, number, extra details and the amount due. */
-function BillInfo({ b, account, check, pending }: { b: Biller; account: string; check?: BillCheck; pending: boolean }) {
-  const ok = check?.valid === true;
-  // The biller echoes the account number back as a detail; it's already shown.
-  const extra = ok ? (check.details ?? []).filter((d) => d.label && d.value && d.label !== b.accountLabel) : [];
-  return (
-    <DCard className="mt-0 mb-4">
-      <DRow label="Account holder" strong>
-        {pending ? <Loader2 size={16} className="ml-auto animate-spin text-muted" /> : ok && check.customer_name ? check.customer_name : "—"}
-      </DRow>
-      <DRow label={b.accountLabel}>
-        <span className="font-mono">{account}</span>
-      </DRow>
-      {extra.map((d) => (
-        <DRow key={d.label} label={d.label}>
-          {d.value}
-        </DRow>
-      ))}
-      {b.requiresCheck && (
-        <DRow label="Amount due" strong>
-          {pending ? "…" : ok && check.amount_due ? <span className="font-mono">{lkr(check.amount_due)}</span> : "Nothing due"}
-        </DRow>
-      )}
-    </DCard>
   );
 }
 
@@ -265,9 +222,11 @@ const splitName = (n: string) => {
 };
 /** "077 123 4567" → "0771234567" */
 const normPhone = (v: string) => v.replace(/[\s-]/g, "");
+/** "+94771234567" → "0771234567", the form MyReload sends receipts to. */
+const localMobile = (v: string) => v.replace(/^\+94/, "0");
 
 /** Review sheet: contact details the pay partner needs, then creates the payment and opens checkout. */
-function Review({ b, account, holder, lkrAmount, usdt, provider }: { b: Biller; account: string; holder: string | null; lkrAmount: number; usdt: number; provider: Provider }) {
+function Review({ b, account, lkrAmount, usdt, provider }: { b: Biller; account: string; lkrAmount: number; usdt: number; provider: Provider }) {
   const router = useRouter();
   const { db } = useApp();
   const u = db.user;
@@ -293,7 +252,7 @@ function Review({ b, account, holder, lkrAmount, usdt, provider }: { b: Biller; 
     if (!ok || create.isPending) return;
     const customerBilling = { firstName: c.first.trim(), lastName: c.last.trim(), email: c.email.trim(), phone };
     create.mutate(
-      { billerId: b.id, accountNumber: account, amount: lkrAmount, provider: PROVIDER_CODE[provider], customerBilling },
+      { providerCode: b.id, accountNumber: account, amount: lkrAmount, provider: PROVIDER_CODE[provider], customerBilling, receiptMobile: localMobile(phone) },
       {
         onSuccess: (p) => {
           commit((db) => {
@@ -310,7 +269,7 @@ function Review({ b, account, holder, lkrAmount, usdt, provider }: { b: Biller; 
               lkr: lkrAmount,
               fee_lkr: 0,
               account,
-              usdt: p.feeBreakdown?.grossAmountUSDT || undefined,
+              usdt: Number(p.usdtAmount) || undefined,
               payment_id: p.id,
             });
           });
@@ -332,7 +291,6 @@ function Review({ b, account, holder, lkrAmount, usdt, provider }: { b: Biller; 
         <Kv label={b.accountLabel}>
           <span className="font-mono">{account}</span>
         </Kv>
-        {holder && <Kv label="Account holder">{holder}</Kv>}
         <Kv label="With">{PNAME[provider]} Pay</Kv>
         <Kv label="Biller fee">Free</Kv>
       </div>
@@ -381,7 +339,9 @@ function Review({ b, account, holder, lkrAmount, usdt, provider }: { b: Biller; 
           `Continue to ${PNAME[provider]} Pay`
         )}
       </Button>
-      <p className={cn(fine, "mt-2.5 text-center")}>You’ll approve the exact USDT amount in {PNAME[provider]}. The bill is paid as soon as it arrives.</p>
+      <p className={cn(fine, "mt-2.5 text-center")}>
+        You’ll approve the exact USDT amount in {PNAME[provider]}. The bill is paid as soon as it arrives, and we text the receipt to your mobile.
+      </p>
       {create.error && <ErrorBox>{create.error.message}</ErrorBox>}
     </>
   );
@@ -406,12 +366,12 @@ export function Paid({ id }: { id: string | null }) {
   }
 
   const phase = billPhase(p);
-  const name = t ? txTitle(db, t) : p.goods?.[0]?.name || "the biller";
+  const name = t ? txTitle(db, t) : p.provider.name || "the biller";
   const provider = t?.provider ?? providerOf(p);
   const via = provider ? `${PNAME[provider]} Pay` : "your exchange";
-  const usdt = p.feeBreakdown?.grossAmountUSDT;
+  const usdt = Number(p.usdtAmount) || undefined;
   const title = { checkout: "Finish paying", paying: "Paying", paid: "Paid", expired: "Payment expired", failed: "Payment failed", bill_failed: "Needs attention" }[phase];
-  const retry = t?.account ? billsUrl({ step: "pay", biller: t.cp.code, acct: t.account }) : billsUrl();
+  const retry = billsUrl({ step: "pay", biller: t?.cp.code ?? p.provider.code, acct: t?.account ?? p.accountNumber });
 
   return (
     <>
@@ -450,8 +410,8 @@ export function Paid({ id }: { id: string | null }) {
               <p className={cn(fine, "mt-1")}>
                 {
                   {
-                    paying: "Your USDT arrived. We’re sending the payment to the biller now.",
-                    paid: `${name} will see it within 1 business day.`,
+                    paying: "Your USDT arrived. We’re sending the payment to the biller now — this usually takes under a minute.",
+                    paid: b2c(p) ? `Sent to ${p.accountNumber}.` : `${name} has received it. It can take up to 1 business day to show on your account.`,
                     expired: "No USDT was collected, so you weren’t charged.",
                     failed: "No USDT was collected, so you weren’t charged.",
                     bill_failed: "We received your USDT. Our team has been alerted and will retry the payment or refund you.",
@@ -462,7 +422,7 @@ export function Paid({ id }: { id: string | null }) {
             </Panel>
           )}
 
-          {phase === "paid" && t && <SaveBiller code={t.cp.code} account={t.account} name={name} />}
+          {phase === "paid" && <SaveBiller code={p.provider.code} account={p.accountNumber} name={name} />}
 
           {phase === "expired" || phase === "failed" ? (
             <ButtonLink size="lg" className="mt-3.5" href={retry}>
@@ -484,13 +444,16 @@ export function Paid({ id }: { id: string | null }) {
   );
 }
 
+/** Mobile top-ups and wallets credit straight away; bills take the biller's own time to post. */
+const b2c = (p: BillPayment) => p.provider.category === "MOBILE" || p.provider.category === "MOBILEWALLET";
+
 /** Reference rows. The USDT row shows only once USDT has been (or is being) collected. */
 function PaymentRows({ p, via, usdt, collected = true }: { p: BillPayment; via: string; usdt?: number; collected?: boolean }) {
   return (
     <DCard className="text-left">
-      {p.paygoBillPaymentId && (
+      {p.reloadReference && (
         <DRow label="Confirmation">
-          <span className="font-mono">{p.paygoBillPaymentId}</span>
+          <span className="font-mono">{p.reloadReference}</span>
         </DRow>
       )}
       <DRow label="CeyPay ref">
@@ -508,8 +471,10 @@ function PaymentRows({ p, via, usdt, collected = true }: { p: BillPayment; via: 
 
 /** Waiting for the user to approve in their exchange. Polling flips the screen when the USDT arrives. */
 function Checkout({ p, via, usdt }: { p: BillPayment; via: string; usdt?: number }) {
+  // The checkout fields only come back while waiting for the USDT; an empty panel still shows the countdown-less state.
+  const checkout = p.checkout ?? { qrContent: null, checkoutLink: null, deepLink: null, expireTime: null };
   return (
-    <CheckoutPanel checkout={p} via={via} amount={usdt ? `${fmt(usdt)} USDT` : lkr(p.amount)} sub={`for ${lkr(p.amount)}`}>
+    <CheckoutPanel checkout={checkout} via={via} amount={usdt ? `${fmt(usdt)} USDT` : lkr(p.amount)} sub={`for ${lkr(p.amount)}`}>
       <PaymentRows p={p} via={via} usdt={usdt} />
     </CheckoutPanel>
   );

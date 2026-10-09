@@ -43,17 +43,18 @@ export const bankShort = (n: string) =>
     .replace("Nations Trust", "NTB")
     .replace("National Savings", "NSB");
 
-export type BillCat = "electricity" | "water" | "mobile" | "internet" | "tv" | "gas" | "insurance" | "rates" | "other";
-/** Bill categories in display order. `short` fits the home grid. */
+export type BillCat = "electricity" | "water" | "mobile" | "internet" | "tv" | "insurance" | "finance" | "wallet" | "driver" | "other";
+/** Bill categories in display order (MyReload's coverage). `short` fits the home grid. */
 export const BILL_CATS: Record<BillCat, { label: string; short: string }> = {
   electricity: { label: "Electricity", short: "Electricity" },
   water: { label: "Water", short: "Water" },
   mobile: { label: "Mobile", short: "Mobile" },
-  internet: { label: "Internet", short: "Internet" },
+  internet: { label: "Internet & landline", short: "Internet" },
   tv: { label: "Television", short: "TV" },
-  gas: { label: "Gas (LPG)", short: "Gas" },
   insurance: { label: "Insurance", short: "Insurance" },
-  rates: { label: "Assessment tax", short: "Rates" },
+  finance: { label: "Finance & leasing", short: "Finance" },
+  wallet: { label: "Mobile wallets", short: "Wallets" },
+  driver: { label: "Driver wallets", short: "Drivers" },
   other: { label: "Other", short: "Other" },
 };
 

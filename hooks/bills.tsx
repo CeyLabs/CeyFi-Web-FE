@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { billerKeys, removeBiller, saveBiller, savedBillersQuery } from "@/lib/api/billers";
-import { billCheckQuery, billKeys, billPaymentQuery, billPhase, billersQuery, createBillPayment, isFinal, type BillPayment } from "@/lib/api/bills";
+import { billKeys, billPaymentQuery, billPhase, billersQuery, createBillPayment, isFinal, type BillPayment } from "@/lib/api/bills";
 import { isLive, type SavedBiller, type Tx } from "@/lib/backend";
 import { uid } from "@/lib/format";
 import { commit, currentDb, currentUser, useApp } from "@/lib/store";
@@ -13,7 +13,7 @@ export function useBillers() {
   return useQuery(billersQuery());
 }
 
-/** One biller by PayGo id. `biller` is undefined while loading or when the id is unknown. */
+/** One biller by MyReload provider code. `biller` is undefined while loading or when the code is unknown. */
 export function useBiller(id: string | null | undefined) {
   const q = useQuery({ ...billersQuery(), select: (l) => l.find((b) => b.id === id) });
   return { ...q, biller: q.data };
@@ -71,22 +71,9 @@ export function useRemoveSavedBiller() {
   });
 }
 
-/** The biller's view of an account: whether it exists, the holder's name, the amount due (postpaid) and limits. */
-export function useBillCheck(billerId: string | undefined, account: string) {
-  return useQuery({ ...billCheckQuery(billerId ?? "", account), enabled: !!billerId && !!account });
-}
-
-/** Checks an account with the biller on demand, caching the result so the pay screen opens with it. */
-export function useVerifyBillAccount() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ billerId, account }: { billerId: string; account: string }) => qc.fetchQuery(billCheckQuery(billerId, account)),
-  });
-}
-
 const POLL_MS = 3000;
 
-/** A bill payment, polled until it settles: crypto expired or failed, or the biller accepted or rejected it. */
+/** A bill payment, polled until it settles: crypto expired or failed, or MyReload delivered or rejected it. */
 export function useBillPayment(id: string | null | undefined) {
   return useQuery({
     ...billPaymentQuery(id ?? ""),
@@ -106,8 +93,8 @@ export function useCreateBillPayment() {
 
 /** Local activity fields that mirror a server payment. */
 function txFields(p: BillPayment): Partial<Tx> {
-  const usdt = p.feeBreakdown?.grossAmountUSDT || undefined;
-  const ref = p.paygoBillPaymentId || undefined;
+  const usdt = Number(p.usdtAmount) || undefined;
+  const ref = p.reloadReference || undefined;
   switch (billPhase(p)) {
     case "checkout":
       return { state: "charging", usdt };

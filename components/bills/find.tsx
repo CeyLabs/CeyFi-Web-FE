@@ -10,7 +10,7 @@ import { CAT_ICON, CATS, Missing, Pending, acct4 } from "./shared";
 import { searchLink } from "./home";
 import { cn } from "cn";
 import { BILL_CATS, type BillCat } from "@/lib/config";
-import { useBiller, useBillers, useSaveBiller, useSavedBillers, useVerifyBillAccount } from "@/hooks/bills";
+import { useBiller, useBillers, useSaveBiller, useSavedBillers } from "@/hooks/bills";
 import { billerCp } from "@/lib/backend";
 import type { Biller } from "@/lib/api/bills";
 import { billsParams, billsUrl } from "@/lib/params";
@@ -41,12 +41,12 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
       <PageHead title="Who do you pay?" back={billsUrl()} backAlways />
       <Pad>
         <div className="mx-auto w-full max-w-[760px]">
-          <p className="mb-4 text-muted">Pay electricity, water, mobile, internet and more with USDT through Binance, Bybit or KuCoin Pay.</p>
+          <p className="mb-4 text-muted">Pay electricity, water, mobile, TV, insurance and more with USDT through Binance, Bybit or KuCoin Pay.</p>
           <label className={cn(searchLink, "h-12 rounded-2xl text-base focus-within:border-brand focus-within:shadow-[0_0_0_4px_var(--brand-soft)] hover:border-line")}>
             <Search />
             <input
               className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted"
-              placeholder="Search billers, e.g. CEB or Dialog"
+              placeholder="Search billers, e.g. CEB, Dialog or AIA"
               aria-label="Search billers"
               autoFocus
               value={q}
@@ -139,7 +139,6 @@ export function AccountStep({ code }: { code: string | null }) {
   const [acct, setAcct] = useState("");
   const [save, setSave] = useState(true);
   const { errs, clear, check } = useErrors(["ba"] as const);
-  const verify = useVerifyBillAccount();
   const { saved: mySaved } = useSavedBillers();
   const saveBiller = useSaveBiller();
   if (isPending || error)
@@ -151,20 +150,17 @@ export function AccountStep({ code }: { code: string | null }) {
     );
   if (!b) return <Missing title="Biller not found" />;
 
-  const numeric = !b.accountRe || /^[\^\\d{}\d,$]*$/.test(b.accountRe.source);
+  // Free-form accounts (insurance policies, leases) can have letters; mobile numbers can't.
+  const numeric = !!b.accountRe && /^[\^\\d{}\d,[\]0-9-$]*$/.test(b.accountRe.source);
+  const mobile = b.accountLabel === "Mobile number";
   const go = () => {
-    const a = acct.replace(/\s/g, "");
-    const ok = b.accountRe ? b.accountRe.test(a) : a.length > 0;
-    if (!check({ ba: ok ? "" : `Enter the ${b.accountLabel.toLowerCase()} from your bill` }) || verify.isPending || saveBiller.isPending) return;
-    // The format looks right; now ask the biller whether the account exists.
-    verify.mutate(
-      { billerId: b.id, account: a },
-      {
-        onSuccess: (r) =>
-          r.valid ? next(a) : check({ ba: `${b.name} doesn’t recognise this ${b.accountLabel.toLowerCase()}. Check it against your bill.` }),
-        onError: (e) => check({ ba: e.message }),
-      },
-    );
+    const a = acct.replace(/[\s-]/g, "");
+    // Same rules as the backend: the provider's format when it has one, else letters, digits and "/".
+    const ok = b.accountRe ? b.accountRe.test(a) : /^[A-Za-z0-9/]{1,50}$/.test(a);
+    // MyReload can't confirm an account before paying, so the format is all we can check.
+    if (!check({ ba: ok ? "" : mobile ? "Enter a mobile number like 077 123 4567" : `Enter the ${b.accountLabel.toLowerCase()} from your bill` }) || saveBiller.isPending)
+      return;
+    next(a);
   };
   const next = (a: string) => {
     if (!save) return router.push(billsUrl({ step: "pay", biller: b.id, acct: a }));
@@ -190,15 +186,19 @@ export function AccountStep({ code }: { code: string | null }) {
       <PageHead title={b.name} back={billsUrl({ step: "find", cat: b.cat })} backAlways />
       <Pad>
         <div className={cn(col, "mx-auto pt-2")}>
-          <DetailHead logo={<CpLogo cp={billerCp(b)} big />} title={b.name} sub={`Enter the ${b.accountLabel.toLowerCase()} from your bill.`} />
+          <DetailHead
+            logo={<CpLogo cp={billerCp(b)} big />}
+            title={b.name}
+            sub={mobile ? "Enter the mobile number to pay." : `Enter the ${b.accountLabel.toLowerCase()} from your bill.`}
+          />
           <Field id="ba" label={b.accountLabel} error={errs.ba} className="mt-5">
             <input
               className={cn(inputCls, "font-mono")}
               id="ba"
-              inputMode={numeric ? "numeric" : "text"}
+              inputMode={numeric || mobile ? "numeric" : "text"}
               autoComplete="off"
               autoFocus
-              placeholder={b.cat === "mobile" ? "07X XXX XXXX" : "e.g. 0123456789"}
+              placeholder={mobile ? "07X XXX XXXX" : "e.g. 0123456789"}
               aria-invalid={!!errs.ba}
               value={acct}
               onChange={(e) => (setAcct(e.target.value), clear("ba"))}
@@ -212,15 +212,16 @@ export function AccountStep({ code }: { code: string | null }) {
             </div>
             <Toggle on={save} onChange={() => setSave(!save)} label="Save this biller" />
           </div>
-          <Button size="lg" className="mt-[18px]" disabled={verify.isPending || saveBiller.isPending} onClick={go}>
-            {verify.isPending || saveBiller.isPending ? (
+          <Button size="lg" className="mt-[18px]" disabled={saveBiller.isPending} onClick={go}>
+            {saveBiller.isPending ? (
               <>
-                <Loader2 className="animate-spin" /> Checking with {b.name}
+                <Loader2 className="animate-spin" /> Saving {b.name}
               </>
             ) : (
               "Continue"
             )}
           </Button>
+          <p className={cn(fine, "mt-2.5 text-center")}>The account can’t be checked before you pay, so double-check it against your bill.</p>
         </div>
       </Pad>
     </>
