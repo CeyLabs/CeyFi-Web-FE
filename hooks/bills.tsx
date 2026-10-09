@@ -139,6 +139,8 @@ const SLOW_POLL_MS = 15_000;
 const WATCH_MS = 10_000;
 /** How long past its checkout deadline an unpaid bill is still watched, giving the backend time to mark it expired. */
 const EXPIRY_GRACE_MS = 2 * 60_000;
+/** An unpaid bill with no checkout deadline stops being watched this long after it was created. */
+const UNPAID_WATCH_MS = 60 * 60_000;
 
 type PaymentQueryState = { state: { data?: BillPayment; error: unknown } };
 
@@ -162,8 +164,10 @@ function watchInterval(q: PaymentQueryState) {
   if (!p) return WATCH_MS;
   const phase = billPhase(p);
   if (isFinal(phase)) return false;
-  const deadline = phase === "checkout" && p.checkout ? expiresAt(p.checkout) : null;
-  return deadline && Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
+  if (phase !== "checkout") return WATCH_MS;
+  // Without a deadline, a checkout this old is abandoned: checkout windows are minutes long.
+  const deadline = (p.checkout && expiresAt(p.checkout)) || Date.parse(p.createdAt) + UNPAID_WATCH_MS;
+  return Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
 }
 
 /**
