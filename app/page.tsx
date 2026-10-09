@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { I } from "@/components/icons";
 import { TxRow } from "@/components/activity";
+import { BillTxSync } from "@/hooks/bills";
 import { Button, ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, RateBadge, RateSource, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
 import { cn } from "cn";
 import { dShort, fmt } from "@/lib/format";
@@ -44,6 +45,8 @@ export default function Home() {
 
   return (
     <>
+      {/* Recent activity lists bill payments: keep the in-flight ones current. */}
+      <BillTxSync />
       <PageHead
         title="Home"
         right={

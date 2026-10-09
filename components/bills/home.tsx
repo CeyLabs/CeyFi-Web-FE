@@ -7,7 +7,7 @@ import { TxRow } from "../activity";
 import { ButtonLink, Card, Empty, Legal, ListPanel, PageHead, Pad, SectionTitle, TitleLink, col, fine } from "../ui";
 import { CAT_ICON, CATS, EditSavedBiller, SavedRow } from "./shared";
 import { cn } from "cn";
-import { useBillers, useLiveSaved } from "@/hooks/bills";
+import { BillTxSync, useBillers, useLiveSaved } from "@/hooks/bills";
 import { lkr } from "@/lib/format";
 import { billsUrl } from "@/lib/params";
 import { useApp } from "@/lib/store";
@@ -32,6 +32,7 @@ export function BillsHome() {
   return (
     <>
       <PageHead title="Bills" />
+      <BillTxSync />
       <Pad>
         <Link className={searchLink} href={billsUrl({ step: "find" })}>
           <Search /> {billers ? `Search ${billers.length} billers` : "Search billers"}
@@ -131,6 +132,7 @@ export function BillHistory() {
   return (
     <>
       <PageHead title="Bill payments" back={billsUrl()} backAlways />
+      <BillTxSync />
       <Pad>
         <div className={cn(col, "mx-auto")}>
           <div className="grid grid-cols-2 gap-2.5">

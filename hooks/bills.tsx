@@ -11,6 +11,7 @@ import {
   billersQuery,
   createBillPayment,
   isFinal,
+  expiresAt,
   numberLookupQuery,
   packageInfoQuery,
   type BillPayment,
@@ -18,6 +19,7 @@ import {
 import { useDebounced } from "./sell";
 import { isLive, type SavedBiller, type Tx } from "@/lib/backend";
 import { localMobile, uid } from "@/lib/format";
+import { isClientError } from "@/lib/api/client";
 import { commit, currentDb, currentUser, useApp } from "@/lib/store";
 import { billsUrl } from "@/lib/params";
 import { toast } from "@/lib/toast";
@@ -133,21 +135,46 @@ const POLL_MS = 3000;
 /** Polling slows down once a payment has been in flight this long, or while MyReload is being checked. */
 const SLOW_AFTER_MS = 2 * 60_000;
 const SLOW_POLL_MS = 15_000;
+/** How often lists (Activity, Bills) check on payments still in flight that aren't on screen. */
+const WATCH_MS = 10_000;
+/** How long past its checkout deadline an unpaid bill is still watched, giving the backend time to mark it expired. */
+const EXPIRY_GRACE_MS = 2 * 60_000;
 
-/** A bill payment, polled until it settles: crypto expired or failed, or MyReload delivered or rejected it. */
-export function useBillPayment(id: string | null | undefined) {
+type PaymentQueryState = { state: { data?: BillPayment; error: unknown } };
+
+/** On its own status screen: quick while waiting for the USDT, slower once it's with MyReload. */
+function liveInterval(q: PaymentQueryState) {
+  const p = q.state.data;
+  // A 4xx (e.g. a payment the backend doesn't know) won't change: stop.
+  if (isClientError(q.state.error)) return false;
+  if (!p) return POLL_MS;
+  const phase = billPhase(p);
+  if (isFinal(phase)) return false;
+  // Waiting on the user in checkout stays quick so the screen flips as soon as the USDT lands.
+  if (phase === "checkout") return POLL_MS;
+  return phase === "checking" || Date.now() - Date.parse(p.createdAt) > SLOW_AFTER_MS ? SLOW_POLL_MS : POLL_MS;
+}
+
+/** From a list: every WATCH_MS until it settles, or until an unpaid one is well past its checkout deadline. */
+function watchInterval(q: PaymentQueryState) {
+  const p = q.state.data;
+  if (isClientError(q.state.error)) return false;
+  if (!p) return WATCH_MS;
+  const phase = billPhase(p);
+  if (isFinal(phase)) return false;
+  const deadline = phase === "checkout" && p.checkout ? expiresAt(p.checkout) : null;
+  return deadline && Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
+}
+
+/**
+ * A bill payment, polled until it settles: crypto expired or failed, or MyReload delivered or rejected it.
+ * `watch`: polled from a list rather than its own screen, so less often.
+ */
+export function useBillPayment(id: string | null | undefined, { watch = false } = {}) {
   return useQuery({
     ...billPaymentQuery(id ?? ""),
     enabled: !!id,
-    refetchInterval: (q) => {
-      const p = q.state.data;
-      if (!p) return POLL_MS;
-      const phase = billPhase(p);
-      if (isFinal(phase)) return false;
-      // Waiting on the user in checkout stays quick so the screen flips as soon as the USDT lands.
-      if (phase === "checkout") return POLL_MS;
-      return phase === "checking" || Date.now() - Date.parse(p.createdAt) > SLOW_AFTER_MS ? SLOW_POLL_MS : POLL_MS;
-    },
+    refetchInterval: watch ? watchInterval : liveInterval,
   });
 }
 
@@ -198,23 +225,25 @@ function txFields(p: BillPayment): Partial<Tx> {
   }
 }
 
-/** Keeps a local Activity entry in step with its server payment while it's on screen. */
-export function useSyncBillTx(t: Tx | undefined) {
-  const { data } = useBillPayment(t?.kind === "bill" ? t.payment_id : undefined);
+/** Keeps a local Activity entry in step with its server payment. `watch`: from a list, polled less often. */
+export function useSyncBillTx(t: Tx | undefined, { watch = false } = {}) {
+  const { data, error } = useBillPayment(t?.kind === "bill" ? t.payment_id : undefined, { watch });
+  const missing = isClientError(error);
   useEffect(() => {
-    if (!t || !data) return;
-    const next = txFields(data);
-    if ((Object.keys(next) as (keyof Tx)[]).some((k) => t[k] !== next[k])) commit(() => void Object.assign(t, next));
-  }, [t, data]);
+    if (!t) return;
+    // The backend doesn't know this payment (e.g. one made through the old bill-collection flow): stop following it.
+    const next: Partial<Tx> | null = data ? txFields(data) : missing && isLive(t.state) ? { state: "failed", message: "We couldn’t find this payment. If USDT left your account, contact support." } : null;
+    if (next && (Object.keys(next) as (keyof Tx)[]).some((k) => t[k] !== next[k])) commit(() => void Object.assign(t, next));
+  }, [t, data, missing]);
   return data;
 }
 
 function SyncOne({ t }: { t: Tx }) {
-  useSyncBillTx(t);
+  useSyncBillTx(t, { watch: true });
   return null;
 }
 
-/** Mounted once in the app frame: keeps every in-flight bill payment in Activity up to date, wherever the user is. */
+/** Mounted on pages that list bill payments (Home, Activity, Bills): keeps the in-flight ones up to date while shown. */
 export function BillTxSync() {
   const { db } = useApp();
   return db.tx.filter((t) => t.kind === "bill" && t.payment_id && isLive(t.state)).map((t) => <SyncOne key={t.id} t={t} />);
