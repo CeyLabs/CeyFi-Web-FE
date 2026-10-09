@@ -3,6 +3,7 @@
 import { useQueryStates } from "nuqs";
 import { useEffect } from "react";
 import { AccountStep, FindBiller } from "@/components/bills/find";
+import { MobileStep } from "@/components/bills/mobile";
 import { BillHistory, BillsHome, SavedBillers } from "@/components/bills/home";
 import { Paid, PayBill } from "@/components/bills/pay";
 import { billsParams } from "@/lib/params";
@@ -22,6 +23,8 @@ export default function BillsPage() {
       return <BillHistory />;
     case "find":
       return <FindBiller cat={cat} />;
+    case "mobile":
+      return <MobileStep initial={acct} />;
     case "account":
       return <AccountStep key={biller} code={biller} />;
     case "pay":

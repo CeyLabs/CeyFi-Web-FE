@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CurLkr, amountBox, amountInput, amountLabel, curChip } from "../trade/composer";
@@ -23,20 +24,28 @@ import {
   TwoCol,
   col,
   fine,
+  iconBtn,
   inputCls,
-  useArmed,
   useErrors,
 } from "../ui";
-import { Missing, Pending } from "./shared";
+import { EditSavedBiller, Missing, Pending } from "./shared";
 import { CheckoutPanel, ProviderPicker } from "../pay-with";
 import { cn } from "cn";
 import { BILL_CATS, EMAIL_RE, MOBILE_RE, PNAME, type Provider } from "@/lib/config";
-import { fmt, lkr, toNum } from "@/lib/format";
+import { fmt, lkr, localMobile, toNum } from "@/lib/format";
 import { useRate } from "@/hooks/fx";
 import { billerCp, lastPaid, newTx, txTitle } from "@/lib/backend";
-import { PROVIDER_CODE, billPhase, providerOf, type Biller, type BillPayment } from "@/lib/api/bills";
+import { PROVIDER_CODE, billKeys, billPhase, expiresAt, providerOf, type Biller, type BillPayment, type PackageInfo } from "@/lib/api/bills";
 import { isClientError } from "@/lib/api/client";
-import { useBillPayment, useBiller, useCreateBillPayment, useRemoveSavedBiller, useSaveBiller, useSavedBillers, useSyncBillTx } from "@/hooks/bills";
+import {
+  useBillPayment,
+  useBiller,
+  useCreateBillPayment,
+  usePackageInfo,
+  useSaveBiller,
+  useSavedBillers,
+  useSyncBillTx,
+} from "@/hooks/bills";
 import { billsUrl } from "@/lib/params";
 import { commit, useApp } from "@/lib/store";
 import { toast } from "@/lib/toast";
@@ -53,7 +62,6 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   const sb = saved ? mine.saved.find((x) => x.id === saved) : undefined;
   const account = sb ? sb.account : (acct || "").trim();
   const { biller: b, isPending: billerPending, error: billerError, refetch } = useBiller(sb ? sb.code : code);
-  const removeSaved = useRemoveSavedBiller();
   // A saved biller's id resolves once your saved list has loaded.
   const isPending = billerPending || (!!saved && mine.isPending);
   const error = billerError ?? (saved ? mine.error : null);
@@ -62,16 +70,9 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
   const [picked, setPicked] = useState<Provider | null>(null);
   const [review, setReview] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const [armed, remove] = useArmed(() => {
-    if (!sb) return;
-    removeSaved.mutate(sb.id, {
-      onSuccess: () => {
-        toast("Biller removed");
-        router.replace(billsUrl());
-      },
-      onError: (e) => toast(e.message),
-    });
-  });
+  // Mobile reloads: what the amount buys (a data or call package), from MyReload.
+  const pkg = usePackageInfo(b?.cat === "mobile" ? account : "", toNum(amount));
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (b && matchMedia("(min-width:761px)").matches) input.current?.focus();
@@ -116,15 +117,23 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
 
   return (
     <>
-      <PageHead title="Pay bill" back={sb ? billsUrl() : billsUrl({ step: "account", biller: b.id })} backAlways />
+      <PageHead
+        title="Pay bill"
+        back={sb ? billsUrl() : b.cat === "mobile" ? billsUrl({ step: "mobile", acct: account }) : billsUrl({ step: "account", biller: b.id })}
+        backAlways
+      />
       <Pad>
         <div className={cn(col, "mx-auto pt-1")}>
           <div className="mb-4 flex items-center gap-3">
             <CpLogo cp={billerCp(b)} />
-            <div className="min-w-0 flex-1">
-              <b className="block truncate font-medium text-ink">{sb?.nickname || db.names[b.id] || b.name}</b>
-              <div className={fine}>{BILL_CATS[b.cat].label}</div>
-            </div>
+            {sb ? (
+              <SavedName nickname={sb.nickname ?? ""} billerName={b.name} cat={BILL_CATS[b.cat].label} onEdit={() => setEditing(true)} />
+            ) : (
+              <div className="min-w-0 flex-1">
+                <b className="block truncate font-medium text-ink">{db.names[b.id] || b.name}</b>
+                <div className={fine}>{BILL_CATS[b.cat].label}</div>
+              </div>
+            )}
           </div>
 
           <DCard className="mt-0 mb-4">
@@ -177,6 +186,7 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
               </div>
             )}
             {b.cat !== "mobile" && b.cat !== "wallet" && <div className={cn(fine, "mt-2")}>Enter the amount on your bill. You can pay part of it, or more in advance.</div>}
+            {pkg && <PackageLine p={pkg} />}
           </div>
 
           <div className="mt-3 flex items-center justify-between">
@@ -201,17 +211,42 @@ export function PayBill({ saved, code, acct }: { saved: string | null; code: str
             {label}
           </Button>
           <RiskNote />
-          {sb && (
-            <button className={cn(fine, "mt-4 block w-full text-center hover:text-err", armed && "font-medium text-err")} onClick={remove}>
-              {armed ? "Tap again to remove" : "Remove this saved biller"}
-            </button>
-          )}
         </div>
       </Pad>
 
+      {sb && <EditSavedBiller saved={editing ? sb : null} onClose={() => setEditing(false)} onRemoved={() => router.replace(billsUrl())} />}
       <Sheet open={review && a > 0} onClose={() => setReview(false)} label="Review payment">
         <Review b={b} account={account} lkrAmount={a} usdt={usdt} provider={provider} />
       </Sheet>
+    </>
+  );
+}
+
+/** "Data 10GB · Calls 100 min · 30 days", for an amount that buys a package. Nothing for a plain reload. */
+function PackageLine({ p }: { p: PackageInfo }) {
+  const parts = [p.dataBundle && `Data ${p.dataBundle}`, p.callsBundle && `Calls ${p.callsBundle}`, p.smsBundle && `SMS ${p.smsBundle}`, p.validityDays && `${p.validityDays} days`].filter(
+    Boolean,
+  );
+  if (!p.packageName && !parts.length) return null;
+  return (
+    <div className="mt-2.5 rounded-xl border border-line-subtle bg-glass-subtle px-3 py-2 text-[13px]">
+      {p.packageName && <b className="block font-medium text-ink">{p.packageName}</b>}
+      {parts.length > 0 && <span className="text-muted">{parts.join(" · ")}</span>}
+    </div>
+  );
+}
+
+/** A saved biller's name (the biller's own under a nickname), with a pencil that opens the edit dialog. */
+function SavedName({ nickname, billerName, cat, onEdit }: { nickname: string; billerName: string; cat: string; onEdit: () => void }) {
+  return (
+    <>
+      <div className="min-w-0 flex-1">
+        <b className="block truncate font-medium text-ink">{nickname || billerName}</b>
+        <div className={fine}>{nickname ? `${billerName} · ${cat}` : cat}</div>
+      </div>
+      <button className={cn(iconBtn, "text-muted hover:text-ink")} aria-label="Edit saved biller" onClick={onEdit}>
+        <Pencil size={16} />
+      </button>
     </>
   );
 }
@@ -222,8 +257,6 @@ const splitName = (n: string) => {
 };
 /** "077 123 4567" → "0771234567" */
 const normPhone = (v: string) => v.replace(/[\s-]/g, "");
-/** "+94771234567" → "0771234567", the form MyReload sends receipts to. */
-const localMobile = (v: string) => v.replace(/^\+94/, "0");
 
 /** Review sheet: contact details the pay partner needs, then creates the payment and opens checkout. */
 function Review({ b, account, lkrAmount, usdt, provider }: { b: Biller; account: string; lkrAmount: number; usdt: number; provider: Provider }) {
@@ -370,7 +403,15 @@ export function Paid({ id }: { id: string | null }) {
   const provider = t?.provider ?? providerOf(p);
   const via = provider ? `${PNAME[provider]} Pay` : "your exchange";
   const usdt = Number(p.usdtAmount) || undefined;
-  const title = { checkout: "Finish paying", paying: "Paying", paid: "Paid", expired: "Payment expired", failed: "Payment failed", bill_failed: "Needs attention" }[phase];
+  const title = {
+    checkout: "Finish paying",
+    paying: "Paying",
+    checking: "Confirming",
+    paid: "Paid",
+    expired: "Payment expired",
+    failed: "Payment failed",
+    bill_failed: "Needs attention",
+  }[phase];
   const retry = billsUrl({ step: "pay", biller: t?.cp.code ?? p.provider.code, acct: t?.account ?? p.accountNumber });
 
   return (
@@ -382,7 +423,7 @@ export function Paid({ id }: { id: string | null }) {
             <Checkout p={p} via={via} usdt={usdt} />
           ) : (
             <Panel className="text-center">
-              {phase === "paying" ? (
+              {phase === "paying" || phase === "checking" ? (
                 <div className="mx-auto my-2 grid size-16 place-items-center rounded-full bg-brand-soft text-brand">
                   <Loader2 size={30} className="animate-spin" />
                 </div>
@@ -400,6 +441,7 @@ export function Paid({ id }: { id: string | null }) {
                 {
                   {
                     paying: `Paying ${name}`,
+                    checking: `Confirming with ${name}`,
                     paid: `Paid to ${name}`,
                     expired: "The payment window closed",
                     failed: "The payment didn’t go through",
@@ -411,6 +453,7 @@ export function Paid({ id }: { id: string | null }) {
                 {
                   {
                     paying: "Your USDT arrived. We’re sending the payment to the biller now — this usually takes under a minute.",
+                    checking: "Your USDT arrived, but the biller hasn’t confirmed yet. We’re checking with them — this can take a while, and you can leave this page. Nothing will be paid twice.",
                     paid: b2c(p) ? `Sent to ${p.accountNumber}.` : `${name} has received it. It can take up to 1 business day to show on your account.`,
                     expired: "No USDT was collected, so you weren’t charged.",
                     failed: "No USDT was collected, so you weren’t charged.",
@@ -471,6 +514,14 @@ function PaymentRows({ p, via, usdt, collected = true }: { p: BillPayment; via: 
 
 /** Waiting for the user to approve in their exchange. Polling flips the screen when the USDT arrives. */
 function Checkout({ p, via, usdt }: { p: BillPayment; via: string; usdt?: number }) {
+  const qc = useQueryClient();
+  const exp = p.checkout ? expiresAt(p.checkout) : null;
+  // Check right as the window closes, so the screen turns to "expired" without waiting for the next poll.
+  useEffect(() => {
+    if (!exp) return;
+    const t = setTimeout(() => qc.invalidateQueries({ queryKey: billKeys.payment(p.id) }), Math.max(0, exp - Date.now()) + 1500);
+    return () => clearTimeout(t);
+  }, [exp, p.id, qc]);
   // The checkout fields only come back while waiting for the USDT; an empty panel still shows the countdown-less state.
   const checkout = p.checkout ?? { qrContent: null, checkoutLink: null, deepLink: null, expireTime: null };
   return (

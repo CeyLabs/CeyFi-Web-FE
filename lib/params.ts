@@ -54,7 +54,7 @@ export const recNewParams = {
 const recNewSer = createSerializer(recNewParams);
 export const recNewUrl = (type: (typeof recurringTypes)[number]) => recNewSer("/recurring/new", { type });
 
-export const billSteps = ["billers", "history", "find", "account", "pay", "paid"] as const;
+export const billSteps = ["billers", "history", "find", "mobile", "account", "pay", "paid"] as const;
 export const billsParams = {
   step: parseAsStringLiteral(billSteps),
   /** Find: category filter. */
@@ -63,7 +63,7 @@ export const billsParams = {
   q: parseAsString.withDefault(""),
   /** Account/pay: biller code, for a biller that isn't saved. */
   biller: parseAsString,
-  /** Pay: account number for an unsaved biller. */
+  /** Pay: account number for an unsaved biller. Mobile: the number to start with. */
   acct: parseAsString,
   /** Pay: saved biller id. */
   saved: parseAsString,

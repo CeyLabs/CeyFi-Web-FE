@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { TxRow } from "../activity";
 import { ButtonLink, Card, Empty, Legal, ListPanel, PageHead, Pad, SectionTitle, TitleLink, col, fine } from "../ui";
-import { CAT_ICON, CATS, SavedRow } from "./shared";
+import { CAT_ICON, CATS, EditSavedBiller, SavedRow } from "./shared";
 import { cn } from "cn";
 import { useBillers, useLiveSaved } from "@/hooks/bills";
 import { lkr } from "@/lib/format";
 import { billsUrl } from "@/lib/params";
 import { useApp } from "@/lib/store";
+import type { SavedBiller } from "@/lib/backend";
 
 const catTile =
   "flex flex-col items-center gap-2 rounded-[18px] border border-line bg-glass-subtle px-1 pt-3.5 pb-3 text-[12.5px] text-fg hover:border-brand hover:text-ink";
@@ -38,7 +40,7 @@ export function BillsHome() {
         <SectionTitle>Pay a bill</SectionTitle>
         <div className="grid grid-cols-4 gap-2 sm:gap-2.5 lg:grid-cols-9">
           {cats.map(([k, c]) => (
-            <Link key={k} className={catTile} href={billsUrl({ step: "find", cat: k })}>
+            <Link key={k} className={catTile} href={k === "mobile" ? billsUrl({ step: "mobile" }) : billsUrl({ step: "find", cat: k })}>
               <span className={catIcon}>{CAT_ICON[k]}</span>
               {c.short}
             </Link>
@@ -84,6 +86,7 @@ export function BillsHome() {
 export function SavedBillers() {
   const { db } = useApp();
   const saved = useLiveSaved();
+  const [editing, setEditing] = useState<SavedBiller | null>(null);
   return (
     <>
       <PageHead
@@ -100,7 +103,7 @@ export function SavedBillers() {
         <div className={cn(col, "mx-auto")}>
           <ListPanel>
             {saved.length ? (
-              saved.map((b) => <SavedRow key={b.id} db={db} b={b} detail />)
+              saved.map((b) => <SavedRow key={b.id} db={db} b={b} detail onEdit={setEditing} />)
             ) : (
               <Empty title="No saved billers">
                 <ButtonLink size="sm" href={billsUrl({ step: "find" })} className="mt-2">
@@ -111,6 +114,7 @@ export function SavedBillers() {
           </ListPanel>
         </div>
       </Pad>
+      <EditSavedBiller saved={editing} onClose={() => setEditing(null)} />
     </>
   );
 }

@@ -1,12 +1,27 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { billerKeys, removeBiller, saveBiller, savedBillersQuery } from "@/lib/api/billers";
-import { billKeys, billPaymentQuery, billPhase, billersQuery, createBillPayment, isFinal, type BillPayment } from "@/lib/api/bills";
+import { billerKeys, removeBiller, renameBiller, saveBiller, savedBillersQuery } from "@/lib/api/billers";
+import {
+  billKeys,
+  billPaymentQuery,
+  billPhase,
+  billersQuery,
+  createBillPayment,
+  isFinal,
+  numberLookupQuery,
+  packageInfoQuery,
+  type BillPayment,
+} from "@/lib/api/bills";
+import { useDebounced } from "./sell";
 import { isLive, type SavedBiller, type Tx } from "@/lib/backend";
-import { uid } from "@/lib/format";
+import { localMobile, uid } from "@/lib/format";
 import { commit, currentDb, currentUser, useApp } from "@/lib/store";
+import { billsUrl } from "@/lib/params";
+import { toast } from "@/lib/toast";
+import type { Biller } from "@/lib/api/bills";
 
 /** All billers, mapped to our categories. */
 export function useBillers() {
@@ -58,6 +73,49 @@ export function useSaveBiller() {
   });
 }
 
+/** Goes on to pay an account, saving it first when `save` is on. A failed save still goes on to pay. */
+export function useContinueToPay() {
+  const router = useRouter();
+  const { saved } = useSavedBillers();
+  const saveBiller = useSaveBiller();
+  const go = (b: Biller, account: string, save: boolean, nickname?: string) => {
+    if (!save) return router.push(billsUrl({ step: "pay", biller: b.id, acct: account }));
+    const known = saved.some((x) => x.code === b.id && x.account === account);
+    saveBiller.mutate(
+      // Undefined leaves an already saved account's name alone; blank names aren't sent.
+      { billerId: b.id, account, nickname: nickname?.trim() || undefined },
+      {
+        onSuccess: (s) => {
+          if (!known) toast(`${b.name} saved`);
+          router.push(billsUrl({ step: "pay", saved: s.id }));
+        },
+        onError: (e) => {
+          toast(`Couldn’t save ${b.name}: ${e.message}`);
+          router.push(billsUrl({ step: "pay", biller: b.id, acct: account }));
+        },
+      },
+    );
+  };
+  return { go, isPending: saveBiller.isPending };
+}
+
+/** Names (or, with a blank name, un-names) a saved biller: backend when signed in, browser for guests. */
+export function useRenameSavedBiller() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, nickname }: { id: string; nickname: string }) => {
+      const name = nickname.trim() || null;
+      // Browser entries (saved as a guest) are renamed locally; the backend wouldn't know them.
+      if (currentUser() && !currentDb().billers.some((x) => x.id === id)) return void (await renameBiller({ id, nickname: name }));
+      commit((db) => {
+        const s = db.billers.find((x) => x.id === id);
+        if (s) s.nickname = name;
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: billerKeys.saved() }),
+  });
+}
+
 /** Removes a saved biller (backend when signed in, browser for guests). */
 export function useRemoveSavedBiller() {
   const qc = useQueryClient();
@@ -72,14 +130,42 @@ export function useRemoveSavedBiller() {
 }
 
 const POLL_MS = 3000;
+/** Polling slows down once a payment has been in flight this long, or while MyReload is being checked. */
+const SLOW_AFTER_MS = 2 * 60_000;
+const SLOW_POLL_MS = 15_000;
 
 /** A bill payment, polled until it settles: crypto expired or failed, or MyReload delivered or rejected it. */
 export function useBillPayment(id: string | null | undefined) {
   return useQuery({
     ...billPaymentQuery(id ?? ""),
     enabled: !!id,
-    refetchInterval: (q) => (q.state.data && isFinal(billPhase(q.state.data)) ? false : POLL_MS),
+    refetchInterval: (q) => {
+      const p = q.state.data;
+      if (!p) return POLL_MS;
+      const phase = billPhase(p);
+      if (isFinal(phase)) return false;
+      // Waiting on the user in checkout stays quick so the screen flips as soon as the USDT lands.
+      if (phase === "checkout") return POLL_MS;
+      return phase === "checking" || Date.now() - Date.parse(p.createdAt) > SLOW_AFTER_MS ? SLOW_POLL_MS : POLL_MS;
+    },
   });
+}
+
+export const MOBILE_NUMBER_RE = /^07\d{8}$/;
+
+/** The operator a mobile number is on, looked up once it's a full number. Not found → `error` (404). */
+export function useNumberLookup(input: string) {
+  const number = localMobile(input);
+  return useQuery({ ...numberLookupQuery(number), enabled: MOBILE_NUMBER_RE.test(number) });
+}
+
+/** What a reload amount buys on a mobile number, once typing has paused. Undefined while there's nothing to show. */
+export function usePackageInfo(input: string, amount: number) {
+  const number = localMobile(input);
+  const debounced = useDebounced(amount);
+  const enabled = MOBILE_NUMBER_RE.test(number) && debounced > 0 && debounced === amount;
+  const q = useQuery({ ...packageInfoQuery(number, debounced), enabled });
+  return enabled ? q.data : undefined;
 }
 
 /** Creates the crypto payment that funds a bill. Seeds the payment query so the status screen opens instantly. */
@@ -99,6 +185,7 @@ function txFields(p: BillPayment): Partial<Tx> {
     case "checkout":
       return { state: "charging", usdt };
     case "paying":
+    case "checking":
       return { state: "processing", usdt };
     case "paid":
       return { state: "completed", usdt, biller_ref: ref, message: undefined };

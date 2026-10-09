@@ -35,7 +35,7 @@ const WATCH_MS = 10_000;
 const EXPIRY_GRACE_MS = 2 * 60_000;
 
 /** `value`, once it has stopped changing for `ms`. */
-function useDebounced<T>(value: T, ms = 400) {
+export function useDebounced<T>(value: T, ms = 400) {
   const [v, setV] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => setV(value), ms);
