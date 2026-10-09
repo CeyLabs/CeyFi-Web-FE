@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { I } from "@/components/icons";
+import { InstallHint } from "@/components/install-hint";
 import { TxRow } from "@/components/activity";
 import { Button, ButtonLink, Empty, Legal, ListPanel, PageHead, Pad, Panel, RateBadge, RateSource, SectionTitle, Soon, TitleLink, fine } from "@/components/ui";
 import { cn } from "cn";
@@ -53,6 +54,7 @@ export default function Home() {
         }
       />
       <Pad>
+        <InstallHint />
         <div className="text-[28px] font-medium tracking-[-.8px] text-ink">{u ? `Hi ${u.name.split(" ")[0]}` : "Welcome to CeyPay"}</div>
         <p className="mt-1 mb-[18px] text-muted">What would you like to do today?</p>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
