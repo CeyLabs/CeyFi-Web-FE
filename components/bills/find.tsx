@@ -22,6 +22,64 @@ const chipOn = "border-brand bg-brand-soft text-ink";
 const card =
   "group flex items-center gap-3 rounded-2xl border border-line bg-glass-subtle p-3.5 text-left transition-colors hover:border-brand hover:bg-glass focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
+/**
+ * The finder's intro, search and category chips. Shared by the biller list and the Mobile step, which is the
+ * Mobile chip's page (number first) rather than a list.
+ */
+export function FinderHeader({
+  billers,
+  cat,
+  q,
+  onSearch,
+  autoFocus,
+}: {
+  billers: Biller[] | undefined;
+  cat: BillCat | null;
+  q: string;
+  onSearch: (q: string) => void;
+  autoFocus?: boolean;
+}) {
+  const needle = q.trim().toLowerCase();
+  const matching = (billers ?? []).filter((b) => !needle || b.name.toLowerCase().includes(needle));
+  const cats = billers ? CATS.filter(([k]) => billers.some((b) => b.cat === k)) : [];
+  const count = (k: BillCat) => matching.filter((b) => b.cat === k).length;
+  return (
+    <>
+      <p className="mb-4 text-muted">Pay electricity, water, mobile, TV, insurance and more with USDT through Binance, Bybit or KuCoin Pay.</p>
+      <label className={cn(searchLink, "h-12 rounded-2xl text-base focus-within:border-brand focus-within:shadow-[0_0_0_4px_var(--brand-soft)] hover:border-line")}>
+        <Search />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted"
+          placeholder="Search billers, e.g. CEB, Dialog or AIA"
+          aria-label="Search billers"
+          autoFocus={autoFocus}
+          value={q}
+          onChange={(e) => onSearch(e.target.value)}
+        />
+      </label>
+      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-3.5 md:mx-0 md:flex-wrap md:px-0">
+        <Link className={cn(chip, !cat && chipOn)} href={billsUrl({ step: "find", q: q || null })} replace aria-current={!cat ? "page" : undefined}>
+          All <span className="font-mono text-[11px] text-muted">{matching.length}</span>
+        </Link>
+        {cats.map(([k, c]) => (
+          <Link
+            key={k}
+            className={cn(chip, cat === k && chipOn)}
+            // Mobile goes number-first: the operator comes from the number rather than a list.
+            href={k === "mobile" ? billsUrl({ step: "mobile" }) : billsUrl({ step: "find", cat: k, q: q || null })}
+            replace
+            aria-current={cat === k ? "page" : undefined}
+          >
+            {CAT_ICON[k]}
+            {c.label}
+            <span className="font-mono text-[11px] text-muted">{count(k)}</span>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /** Pick a biller. Ones you've saved go straight to paying. */
 export function FindBiller({ cat }: { cat: BillCat | null }) {
   const { db } = useApp();
@@ -30,8 +88,6 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
   const needle = q.trim().toLowerCase();
   const matching = (billers ?? []).filter((b) => !needle || b.name.toLowerCase().includes(needle));
   const list = matching.filter((b) => !cat || b.cat === cat);
-  const cats = billers ? CATS.filter(([k]) => billers.some((b) => b.cat === k)) : [];
-  const count = (k: BillCat) => matching.filter((b) => b.cat === k).length;
   // Saved billers lead the page until you search or pick a category.
   const { saved: mySaved } = useSavedBillers();
   const saved = !needle && !cat && billers ? mySaved.flatMap((s) => billers.filter((b) => b.id === s.code).map((b) => ({ s, b }))) : [];
@@ -41,37 +97,7 @@ export function FindBiller({ cat }: { cat: BillCat | null }) {
       <PageHead title="Who do you pay?" back={billsUrl()} backAlways />
       <Pad>
         <div className="mx-auto w-full max-w-[760px]">
-          <p className="mb-4 text-muted">Pay electricity, water, mobile, TV, insurance and more with USDT through Binance, Bybit or KuCoin Pay.</p>
-          <label className={cn(searchLink, "h-12 rounded-2xl text-base focus-within:border-brand focus-within:shadow-[0_0_0_4px_var(--brand-soft)] hover:border-line")}>
-            <Search />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted"
-              placeholder="Search billers, e.g. CEB, Dialog or AIA"
-              aria-label="Search billers"
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value || null)}
-            />
-          </label>
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-3.5 md:mx-0 md:flex-wrap md:px-0">
-            <Link className={cn(chip, !cat && chipOn)} href={billsUrl({ step: "find", q: q || null })} replace aria-current={!cat ? "page" : undefined}>
-              All <span className="font-mono text-[11px] text-muted">{matching.length}</span>
-            </Link>
-            {cats.map(([k, c]) => (
-              <Link
-                key={k}
-                className={cn(chip, cat === k && chipOn)}
-                // Mobile goes number-first: the operator is detected rather than picked from a list.
-                href={k === "mobile" ? billsUrl({ step: "mobile" }) : billsUrl({ step: "find", cat: k, q: q || null })}
-                replace={k !== "mobile"}
-                aria-current={cat === k ? "page" : undefined}
-              >
-                {CAT_ICON[k]}
-                {c.label}
-                <span className="font-mono text-[11px] text-muted">{count(k)}</span>
-              </Link>
-            ))}
-          </div>
+          <FinderHeader billers={billers} cat={cat} q={q} onSearch={(v) => setQ(v || null)} autoFocus />
 
           {!billers ? (
             <Pending error={error} onRetry={() => refetch()} />

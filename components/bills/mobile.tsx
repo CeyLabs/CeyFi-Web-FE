@@ -4,9 +4,11 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { Button, CpLogo, DCard, Field, LRow, ListPanel, PageHead, Pad, SectionTitle, Toggle, col, fine, inputCls, billerLogo, useErrors } from "../ui";
+import { Button, CpLogo, DCard, Field, LRow, ListPanel, PageHead, Pad, SectionTitle, Toggle, fine, inputCls, billerLogo, useErrors } from "../ui";
 import { OPS } from "@/lib/config";
 import { Pending } from "./shared";
+import { FinderHeader } from "./find";
+import { useRouter } from "next/navigation";
 import { cn } from "cn";
 import { MOBILE_NUMBER_RE, useBillers, useContinueToPay, useNumberLookup, useSavedBillers } from "@/hooks/bills";
 import { localMobile, phone } from "@/lib/format";
@@ -41,6 +43,7 @@ const row = "flex min-h-12 items-center justify-between gap-3.5 py-2 text-[14.5p
 
 /** Mobile reloads and bills, number first: the operator comes from the number's prefix; the plan is preset from MyReload and can be changed. */
 export function MobileStep({ initial }: { initial: string | null }) {
+  const router = useRouter();
   const { data: billers, error, refetch } = useBillers();
   const { saved } = useSavedBillers();
   const pay = useContinueToPay();
@@ -59,7 +62,7 @@ export function MobileStep({ initial }: { initial: string | null }) {
   if (!billers)
     return (
       <>
-        <PageHead title="Mobile" back={billsUrl()} backAlways />
+        <PageHead title="Who do you pay?" back={billsUrl()} backAlways />
         <Pending error={error} onRetry={() => refetch()} />
       </>
     );
@@ -77,9 +80,11 @@ export function MobileStep({ initial }: { initial: string | null }) {
 
   return (
     <>
-      <PageHead title="Mobile" back={billsUrl()} backAlways />
+      <PageHead title="Who do you pay?" back={billsUrl()} backAlways />
       <Pad>
-        <div className={cn(col, "mx-auto pt-2")}>
+        <div className="mx-auto w-full max-w-[760px]">
+          {/* Searching leaves for the biller list, where the search carries on. */}
+          <FinderHeader billers={billers} cat="mobile" q="" onSearch={(v) => router.replace(billsUrl({ step: "find", q: v || null }))} />
           <Field id="mn" label="Mobile number" error={errs.mn || (unknownPrefix ? "That isn’t a Sri Lankan mobile number" : undefined)} className="mt-0">
             <div className="relative">
               <input
