@@ -6,6 +6,7 @@ import { Frame, Toast } from "@/components/shell";
 import { PrivyAuth } from "@/components/signin";
 import { AddBankDialog } from "@/components/account/add-bank";
 import { Providers } from "@/components/providers";
+import { ServiceWorker } from "@/components/service-worker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,8 +21,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CeyPay",
+  title: "CeyFi",
   description: "Sell USDT to your bank, send rupees home, and pay bills with USDT through Binance, Bybit or KuCoin Pay.",
+  applicationName: "CeyFi",
+  // Opaque bar: the layout has no top safe-area padding, so a translucent one would sit over content.
+  appleWebApp: { capable: true, title: "CeyFi", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {
@@ -45,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <PrivyAuth />
               <AddBankDialog />
               <Toast />
+              <ServiceWorker />
             </NuqsAdapter>
           </Providers>
         </div>
