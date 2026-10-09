@@ -38,7 +38,7 @@ function AddBankForm({ onDone }: { onDone: () => void }) {
     const ok = check({
       pb: bankCode ? "" : "Choose a bank",
       pa: /^\d{6,20}$/.test(num) ? "" : "Account number should be 6 to 20 digits",
-      pn: holder.length >= 3 ? "" : "Enter the account holder’s name",
+      pn: holder.length < 3 ? "Enter the account holder’s name" : holder.length > 30 ? "Use 30 characters or fewer, as the bank shows it" : "",
     });
     if (!ok || add.isPending) return;
     add.mutate(
@@ -75,7 +75,7 @@ function AddBankForm({ onDone }: { onDone: () => void }) {
         <input className={cn(inputCls, "font-mono")} id="pa" aria-invalid={!!errs.pa} inputMode="numeric" autoComplete="off" value={acct} onChange={(e) => (setAcct(e.target.value), clear("pa"))} />
       </Field>
       <Field id="pn" label="Account holder name" error={errs.pn} hint="As registered with the bank, in the name on your ID.">
-        <input className={inputCls} id="pn" aria-invalid={!!errs.pn} maxLength={255} value={name} onChange={(e) => (setName(e.target.value), clear("pn"))} />
+        <input className={inputCls} id="pn" aria-invalid={!!errs.pn} maxLength={30} value={name} onChange={(e) => (setName(e.target.value), clear("pn"))} />
       </Field>
       <Field id="pr" label="Branch (optional)">
         <input className={inputCls} id="pr" placeholder="e.g. Colombo 03" maxLength={255} value={branch} onChange={(e) => setBranch(e.target.value)} />
