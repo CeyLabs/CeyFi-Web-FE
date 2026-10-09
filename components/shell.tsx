@@ -15,8 +15,6 @@ import { toastManager } from "@/lib/toast";
 import { openSignIn } from "@/lib/auth";
 import { RequireAuth } from "@/components/signin";
 import { ComingSoon } from "@/components/soon";
-import { BillTxSync } from "@/hooks/bills";
-import { SellTxSync } from "@/hooks/sell";
 import { tradeParams, tradeUrl } from "@/lib/params";
 
 /** Which nav item is active: trade screens map to their tab, sub-routes to their parent. */
@@ -180,8 +178,6 @@ export function Frame({ children }: { children: ReactNode }) {
         </main>
       </div>
       <BottomNav />
-      <BillTxSync />
-      <SellTxSync />
     </>
   );
 }

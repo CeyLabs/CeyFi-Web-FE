@@ -33,9 +33,11 @@ const POLL_MS = 3000;
 const WATCH_MS = 10_000;
 /** How long past its checkout deadline an unpaid sale is still watched, giving the backend time to mark it expired. */
 const EXPIRY_GRACE_MS = 2 * 60_000;
+/** An unpaid sale with no checkout deadline stops being watched this long after it was created. */
+const UNPAID_WATCH_MS = 60 * 60_000;
 
 /** `value`, once it has stopped changing for `ms`. */
-function useDebounced<T>(value: T, ms = 400) {
+export function useDebounced<T>(value: T, ms = 400) {
   const [v, setV] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => setV(value), ms);
@@ -249,7 +251,7 @@ export function useSellPayment(id: string | null | undefined) {
 }
 
 /**
- * Mounted once in the app frame: mirrors the user's sales into Activity. The list loads once (and again after
+ * Mounted on pages that list sales (Home, Activity): mirrors the user's sales into Activity. The list loads once (and again after
  * a new sale); only the sales still in flight are polled, each on its own, until they settle.
  */
 export function SellTxSync() {
@@ -269,8 +271,10 @@ function watchInterval(q: { state: { data?: SellPayment } }) {
   const p = q.state.data;
   if (!p) return WATCH_MS;
   if (isFinalSell(p.status)) return false;
-  const deadline = p.status === "AWAITING_PAYMENT" && p.checkout ? expiresAt(p.checkout) : null;
-  return deadline && Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
+  if (p.status !== "AWAITING_PAYMENT") return WATCH_MS;
+  // Without a deadline, a checkout this old is abandoned: checkout windows are minutes long.
+  const deadline = (p.checkout && expiresAt(p.checkout)) || Date.parse(p.createdAt) + UNPAID_WATCH_MS;
+  return Date.now() > deadline + EXPIRY_GRACE_MS ? false : WATCH_MS;
 }
 
 /** Module-level so useQueries memoizes it: a new array only when a sale actually changes. */

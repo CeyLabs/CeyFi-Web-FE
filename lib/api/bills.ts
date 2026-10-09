@@ -67,6 +67,22 @@ export type BillPayment = {
   createdAt: string;
 };
 
+/** The operator MyReload detected for a mobile number. `supported`: we list that provider. */
+export type NumberLookup = { providerCode: string; providerName: string | null; prePost: string | null; supported: boolean };
+
+/** What a mobile reload amount buys. Every field is MyReload's own text and may be missing. */
+export type PackageInfo = {
+  packageStatus: string | null;
+  availability: string | null;
+  newAmount: string | null;
+  providerName: string | null;
+  packageName: string | null;
+  callsBundle: string | null;
+  smsBundle: string | null;
+  dataBundle: string | null;
+  validityDays: string | null;
+};
+
 /* ---------- app types ---------- */
 
 export type Biller = {
@@ -130,8 +146,11 @@ export const providerOf = (p: BillPayment): Provider | undefined => {
   return k === "binance" || k === "bybit" || k === "kucoin" ? k : undefined;
 };
 
-/** Where a bill payment is, from the user's point of view. */
-export type BillPhase = "checkout" | "paying" | "paid" | "expired" | "failed" | "bill_failed";
+/**
+ * Where a bill payment is, from the user's point of view.
+ * checking: MyReload didn't answer and the reload is being looked up; it can take a while.
+ */
+export type BillPhase = "checkout" | "paying" | "checking" | "paid" | "expired" | "failed" | "bill_failed";
 export function billPhase(p: Pick<BillPayment, "status">): BillPhase {
   switch (p.status) {
     case "AWAITING_PAYMENT":
@@ -144,11 +163,13 @@ export function billPhase(p: Pick<BillPayment, "status">): BillPhase {
       return "failed";
     case "RELOAD_FAILED":
       return "bill_failed";
+    case "UNKNOWN":
+      return "checking";
     default:
       return "paying";
   }
 }
-export const isFinal = (phase: BillPhase) => phase !== "checkout" && phase !== "paying";
+export const isFinal = (phase: BillPhase) => phase !== "checkout" && phase !== "paying" && phase !== "checking";
 
 /** `expireTime` arrives as epoch ms (number or numeric string) or an ISO date. */
 export const expiresAt = (p: Pick<Checkout, "expireTime">) => {
@@ -179,6 +200,8 @@ export const billKeys = {
   all: ["bills"] as const,
   billers: () => [...billKeys.all, "billers"] as const,
   payment: (id: string) => [...billKeys.all, "payment", id] as const,
+  lookup: (number: string) => [...billKeys.all, "lookup", number] as const,
+  package: (number: string, amount: number) => [...billKeys.all, "package", number, amount] as const,
 };
 
 export const billersQuery = () =>
@@ -193,6 +216,23 @@ export const billPaymentQuery = (id: string) =>
   queryOptions({
     queryKey: billKeys.payment(id),
     queryFn: () => api<BillPayment>(`/reload/payment/${encodeURIComponent(id)}`),
+  });
+
+export const numberLookupQuery = (number: string) =>
+  queryOptions({
+    queryKey: billKeys.lookup(number),
+    queryFn: () => api<NumberLookup>(`/reload/lookup?number=${encodeURIComponent(number)}`),
+    // A number rarely changes operator; a 404 (not detected) won't change on retry.
+    staleTime: 30 * 60_000,
+    retry: false,
+  });
+
+export const packageInfoQuery = (number: string, amount: number) =>
+  queryOptions({
+    queryKey: billKeys.package(number, amount),
+    queryFn: () => api<PackageInfo>(`/reload/package?number=${encodeURIComponent(number)}&amount=${amount}`),
+    staleTime: 10 * 60_000,
+    retry: false,
   });
 
 export const createBillPayment = (body: CreateBillPayment) => api<BillPayment>("/reload/payment", { method: "POST", body });

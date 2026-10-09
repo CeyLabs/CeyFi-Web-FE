@@ -454,7 +454,78 @@ const BILLER_COLORS: Record<string, [string, string]> = {
   Airtel: ["#e40000", "#fff"],
 };
 
-/** Counterparty logo: generated initials for people, brand colours for billers. */
+/**
+ * MyReload provider code → logo in /public/billers (160px square webp). Sub-brands share their parent's
+ * (Dialog TV, broadband, Finance and LesiPay, mCash → Mobitel, Airtel TV, Janashakthi General, Allianz Life).
+ */
+const BILLER_LOGOS: Record<string, string> = {
+  DIAP: "dialog",
+  DIAB: "dialog",
+  HBBP: "dialog",
+  HBBB: "dialog",
+  DTVP: "dialog",
+  DTVB: "dialog",
+  MOBP: "mobitel",
+  MOBB: "mobitel",
+  HUTP: "hutch",
+  HUTB: "hutch",
+  AIRP: "airtel",
+  AIRB: "airtel",
+  SLTP: "slt",
+  SLTB: "slt",
+  CEBB: "ceb",
+  NWSD: "nwsdb",
+  LECO: "leco",
+  EZCT: "ezcash",
+  EZCW: "ezcash",
+  MCAT: "mobitel",
+  ATLT: "airtel",
+  DIHT: "dish-tv",
+  SUDT: "sun-direct",
+  TAST: "tata-play",
+  VCDT: "d2h",
+  ASKC: "ask-cable",
+  TVLT: "tv-lanka",
+  AIAL: "aia",
+  CEYL: "ceylinco-life",
+  CEYG: "ceylinco-general",
+  JSIL: "janashakthi",
+  JSIG: "janashakthi",
+  LOLL: "lolc-life",
+  SLIL: "slic",
+  UAIL: "union-assurance",
+  HNBL: "hnb-life",
+  AZIG: "allianz",
+  AZIL: "allianz",
+  AMTL: "amana",
+  ARPL: "arpico-insurance",
+  FFIL: "fairfirst",
+  SANG: "sanasa-general",
+  SANL: "sanasa-life",
+  SLOL: "softlogic-life",
+  ARPF: "arpico-finance",
+  ASTL: "assetline",
+  ASMF: "amf",
+  BIMF: "bimputh",
+  CENF: "central-finance",
+  DIAF: "dialog",
+  DILP: "dialog",
+  FINF: "fintrex",
+  HNBF: "hnb-finance",
+  ORIF: "orient-finance",
+  SENF: "senkadagala",
+  AASF: "asia-asset",
+  CDBF: "cdb",
+  BEMF: "berendina",
+  PCME: "pickme",
+  UBEA: "uber-eats",
+  UBTX: "uber",
+};
+
+/** The logo image for a MyReload provider code, if we have one. */
+export const billerLogo = (code: string) => (BILLER_LOGOS[code] ? `/billers/${BILLER_LOGOS[code]}.webp` : undefined);
+
+/** Counterparty logo: generated initials for people, the biller's logo or brand colours for billers. */
 export function CpLogo({ cp, big }: { cp: Counterparty | { kind: "person"; name: string }; big?: boolean }) {
   const cls = big
     ? "mx-auto mb-3.5 grid size-[76px] place-items-center rounded-[22px] text-2xl font-semibold shadow-[0_0_0_1px_var(--line)] [&_svg]:size-[34px]"
@@ -474,6 +545,14 @@ export function CpLogo({ cp, big }: { cp: Counterparty | { kind: "person"; name:
     );
   }
   const code = "code" in cp ? cp.code : undefined;
+  const logo = code ? billerLogo(code) : undefined;
+  if (logo)
+    return (
+      <span className={cn(cls, "overflow-hidden bg-white")}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny static webp; next/image adds nothing here */}
+        <img src={logo} alt="" width={160} height={160} className="size-full object-cover" />
+      </span>
+    );
   const brand = code ? BILLER_COLORS[code] : undefined;
   const [bg, fg] = brand || [`hsl(${hue(cp.name)} 45% 40%)`, "#fff"];
   return (

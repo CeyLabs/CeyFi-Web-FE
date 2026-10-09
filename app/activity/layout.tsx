@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { ActivitySheet } from "@/components/activity";
+import { BillTxSync } from "@/hooks/bills";
+import { SellTxSync } from "@/hooks/sell";
 
 /** Hosts the details panel, so it stays mounted (and animates) while `/activity/:id` changes. */
 export default function ActivityLayout({ children }: { children: ReactNode }) {
@@ -7,6 +9,8 @@ export default function ActivityLayout({ children }: { children: ReactNode }) {
     <>
       {children}
       <ActivitySheet />
+      <BillTxSync />
+      <SellTxSync />
     </>
   );
 }
