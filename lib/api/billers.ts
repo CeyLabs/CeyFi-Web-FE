@@ -12,7 +12,7 @@ type SavedBillerDto = {
   accountLabel: string | null;
   accountNumber: string;
   nickname: string | null;
-  /** false: PayGo no longer lists the biller. null: the backend couldn't check. */
+  /** false: not an active MyReload provider (disabled, or an old PayGo id). null: the backend couldn't check. */
   available: boolean | null;
   lastPaidAt: string | null;
   createdAt: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Droplet, Flame, Landmark, Loader2, Receipt, ShieldCheck, Smartphone, Tv, Wifi, Zap } from "lucide-react";
+import { Car, Droplet, Landmark, Loader2, Receipt, ShieldCheck, Smartphone, Tv, Wallet, Wifi, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, ButtonLink, CpLogo, Empty, LRow, PageHead, button } from "../ui";
 import { useBiller } from "@/hooks/bills";
@@ -15,9 +15,10 @@ export const CAT_ICON: Record<BillCat, ReactNode> = {
   mobile: <Smartphone />,
   internet: <Wifi />,
   tv: <Tv />,
-  gas: <Flame />,
   insurance: <ShieldCheck />,
-  rates: <Landmark />,
+  finance: <Landmark />,
+  wallet: <Wallet />,
+  driver: <Car />,
   other: <Receipt />,
 };
 

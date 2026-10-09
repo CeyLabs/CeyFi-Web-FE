@@ -2,68 +2,75 @@ import { queryOptions } from "@tanstack/react-query";
 import { api } from "./client";
 import type { BillCat, Provider } from "../config";
 
-/* Bill collection API (PayGo billers, paid with USDT through Binance Pay, Bybit Pay or KuCoin Pay). */
+/* Bills & reloads API (MyReload providers, paid with USDT through Binance Pay, Bybit Pay or KuCoin Pay). */
 
 /* ---------- wire types ---------- */
 
-type BillerDto = {
-  id: string;
-  name: string;
-  category: string;
-  account_label: string;
-  account_regex: string;
-  min: number;
-  max: number;
-  prepaid: boolean;
-  requires_check: boolean;
-};
+/** MyReload's provider categories. */
+type ProviderCategory = "MOBILE" | "MOBILEWALLET" | "FIXEDLINE" | "TELEVISION" | "UTILITIES" | "INSURANCE" | "FINANCE" | "TAXI";
 
-export type BillCheck = {
-  valid: boolean;
-  customer_name: string | null;
-  amount_due: number | null;
-  min: number | null;
-  max: number | null;
-  /** Extra facts from the biller, e.g. billing period or due date. */
-  details?: { label: string; value: string }[];
+type ProviderDto = {
+  code: string;
+  name: string;
+  category: ProviderCategory;
+  accountLabel: string;
+  accountRegex: string | null;
+  minAmount: number | null;
+  maxAmount: number | null;
 };
 
 export type CustomerBilling = { firstName: string; lastName: string; email: string; phone: string };
 
 export type CreateBillPayment = {
-  billerId: string;
+  providerCode: string;
   accountNumber: string;
-  /** LKR. Must equal the checked amount due for billers that require a check. */
+  /** Whole LKR: MyReload doesn't take cents. */
   amount: number;
   provider: "BINANCE" | "BYBIT" | "KUCOIN";
   customerBilling: CustomerBilling;
+  /** Mobile MyReload sends the receipt SMS to (07XXXXXXXX). */
+  receiptMobile?: string;
 };
 
-/** Crypto collection status, then PayGo's status once the USDT has arrived. */
-export type PayStatus = "PENDING_PROVIDER" | "INITIATED" | "USER_REVIEW" | "PAID" | "EXPIRED" | "FAILED";
-export type BillStatus = "PENDING" | "RETRYING" | "SUCCEEDED" | "FAILED";
+/**
+ * Where a reload is: waiting for the USDT, then sending it to the biller through MyReload.
+ * UNKNOWN: MyReload didn't answer; it's being looked up, never resent.
+ */
+export type ReloadStatus =
+  | "AWAITING_PAYMENT"
+  | "PAID"
+  | "SUBMITTING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "EXPIRED"
+  | "FAILED"
+  | "RELOAD_FAILED"
+  | "UNKNOWN";
+
+export type Checkout = { qrContent: string | null; checkoutLink: string | null; deepLink: string | null; expireTime: string | number | null };
 
 export type BillPayment = {
   id: string;
-  status: PayStatus;
+  status: ReloadStatus;
+  paymentNo: string;
+  provider: { code: string; name: string; category: ProviderCategory; accountLabel: string };
+  accountNumber: string;
   /** LKR bill amount. */
   amount: number;
-  checkoutLink: string | null;
-  deepLink: string | null;
-  qrContent: string | null;
-  expireTime: string | number | null;
+  /** Gross USDT the user pays, e.g. "3.27". */
+  usdtAmount: string;
+  payProvider?: "BINANCE_PAY" | "BYBIT_PAY" | "KUCOIN_PAY" | string;
+  /** MyReload's reference once it has taken the payment. */
+  reloadReference: string | null;
+  /** Only while waiting for the USDT. */
+  checkout?: Checkout;
   createdAt: string;
-  paymentNo: string;
-  paymentProvider?: "BINANCE_PAY" | "BYBIT_PAY" | "KUCOIN_PAY" | string;
-  goods?: { name: string; description?: string }[];
-  feeBreakdown?: { grossAmountUSDT: number };
-  billStatus?: BillStatus | null;
-  paygoBillPaymentId?: string | null;
 };
 
 /* ---------- app types ---------- */
 
 export type Biller = {
+  /** MyReload provider code, e.g. CEBB. */
   id: string;
   name: string;
   cat: BillCat;
@@ -71,24 +78,34 @@ export type Biller = {
   accountRe: RegExp | null;
   min: number;
   max: number;
-  /** Postpaid billers: the amount is whatever the bill says, fetched with a check. */
-  requiresCheck: boolean;
 };
 
-/** PayGo's free-text category → our category. Anything unknown lands in "other". */
-const CAT_MATCH: [RegExp, BillCat][] = [
-  [/electric|power/i, "electricity"],
-  [/water/i, "water"],
-  [/mobile|postpaid|telco|phone/i, "mobile"],
-  [/internet|broadband|fibre|fiber/i, "internet"],
-  [/tv|television/i, "tv"],
-  [/gas|lpg/i, "gas"],
-  [/insur/i, "insurance"],
-  [/rate|tax|council|municipal/i, "rates"],
-];
-const catOf = (category: string): BillCat => CAT_MATCH.find(([re]) => re.test(category))?.[1] ?? "other";
+/** MyReload category → our category. Utilities split by name into electricity and water. */
+function catOf(p: Pick<ProviderDto, "category" | "name">): BillCat {
+  switch (p.category) {
+    case "MOBILE":
+      return "mobile";
+    case "MOBILEWALLET":
+      return "wallet";
+    case "FIXEDLINE":
+      return "internet";
+    case "TELEVISION":
+      return "tv";
+    case "INSURANCE":
+      return "insurance";
+    case "FINANCE":
+      return "finance";
+    case "TAXI":
+      return "driver";
+    case "UTILITIES":
+      return /water/i.test(p.name) ? "water" : /electric/i.test(p.name) ? "electricity" : "other";
+    default:
+      return "other";
+  }
+}
 
-function regexOf(src: string) {
+function regexOf(src: string | null) {
+  if (!src) return null;
   try {
     return new RegExp(src);
   } catch {
@@ -96,38 +113,45 @@ function regexOf(src: string) {
   }
 }
 
-const toBiller = (b: BillerDto): Biller => ({
-  id: b.id,
-  name: b.name,
-  cat: catOf(b.category),
-  accountLabel: b.account_label || "Account number",
-  accountRe: regexOf(b.account_regex),
-  min: Number(b.min) || 0,
-  max: Number(b.max) || Infinity,
-  requiresCheck: b.requires_check,
+const toBiller = (p: ProviderDto): Biller => ({
+  id: p.code,
+  name: p.name,
+  cat: catOf(p),
+  accountLabel: p.accountLabel || "Account number",
+  accountRe: regexOf(p.accountRegex),
+  min: p.minAmount || 1,
+  max: p.maxAmount || Infinity,
 });
 
 export const PROVIDER_CODE: Record<Provider, CreateBillPayment["provider"]> = { binance: "BINANCE", bybit: "BYBIT", kucoin: "KUCOIN" };
 /** "BINANCE_PAY" → "binance" */
 export const providerOf = (p: BillPayment): Provider | undefined => {
-  const k = p.paymentProvider?.replace(/_PAY$/, "").toLowerCase();
+  const k = p.payProvider?.replace(/_PAY$/, "").toLowerCase();
   return k === "binance" || k === "bybit" || k === "kucoin" ? k : undefined;
 };
 
 /** Where a bill payment is, from the user's point of view. */
 export type BillPhase = "checkout" | "paying" | "paid" | "expired" | "failed" | "bill_failed";
-export function billPhase(p: Pick<BillPayment, "status" | "billStatus">): BillPhase {
-  if (p.status === "EXPIRED") return "expired";
-  if (p.status === "FAILED") return "failed";
-  if (p.status !== "PAID") return "checkout";
-  if (p.billStatus === "SUCCEEDED") return "paid";
-  if (p.billStatus === "FAILED") return "bill_failed";
-  return "paying";
+export function billPhase(p: Pick<BillPayment, "status">): BillPhase {
+  switch (p.status) {
+    case "AWAITING_PAYMENT":
+      return "checkout";
+    case "COMPLETED":
+      return "paid";
+    case "EXPIRED":
+      return "expired";
+    case "FAILED":
+      return "failed";
+    case "RELOAD_FAILED":
+      return "bill_failed";
+    default:
+      return "paying";
+  }
 }
 export const isFinal = (phase: BillPhase) => phase !== "checkout" && phase !== "paying";
 
 /** `expireTime` arrives as epoch ms (number or numeric string) or an ISO date. */
-export const expiresAt = (p: Pick<BillPayment, "expireTime">) => {
+export const expiresAt = (p: Pick<Checkout, "expireTime">) => {
   const v = p.expireTime;
   if (v === null || v === undefined || v === "") return null;
   const t = typeof v === "number" || /^\d+$/.test(v) ? Number(v) : Date.parse(v);
@@ -139,7 +163,7 @@ export const expiresAt = (p: Pick<BillPayment, "expireTime">) => {
  * (a data URL, or bare base64 when the logo step fails); Bybit sends text to encode.
  */
 export type CheckoutQr = { kind: "image"; src: string } | { kind: "text"; value: string } | null;
-export function checkoutQr(p: Pick<BillPayment, "qrContent" | "checkoutLink">): CheckoutQr {
+export function checkoutQr(p: Pick<Checkout, "qrContent" | "checkoutLink">): CheckoutQr {
   const v = p.qrContent?.trim();
   if (v?.startsWith("data:image/")) return { kind: "image", src: v };
   // Bare base64 PNG: starts with the PNG signature ("\x89PNG" encoded).
@@ -154,29 +178,21 @@ export function checkoutQr(p: Pick<BillPayment, "qrContent" | "checkoutLink">): 
 export const billKeys = {
   all: ["bills"] as const,
   billers: () => [...billKeys.all, "billers"] as const,
-  check: (billerId: string, account: string) => [...billKeys.all, "check", billerId, account] as const,
   payment: (id: string) => [...billKeys.all, "payment", id] as const,
 };
 
 export const billersQuery = () =>
   queryOptions({
     queryKey: billKeys.billers(),
-    queryFn: async () => (await api<{ data: BillerDto[] }>("/bill-collection/billers")).data.map(toBiller),
-    // The backend caches PayGo's catalog for 5 minutes too.
+    queryFn: async () => (await api<{ data: ProviderDto[] }>("/reload/provider")).data.map(toBiller),
+    // The provider list only changes when an admin edits it.
     staleTime: 5 * 60_000,
-  });
-
-export const billCheckQuery = (billerId: string, account: string) =>
-  queryOptions({
-    queryKey: billKeys.check(billerId, account),
-    queryFn: () => api<BillCheck>("/bill-collection/check", { method: "POST", body: { billerId, accountNumber: account } }),
-    staleTime: 60_000,
   });
 
 export const billPaymentQuery = (id: string) =>
   queryOptions({
     queryKey: billKeys.payment(id),
-    queryFn: () => api<BillPayment>(`/bill-collection/payment/${encodeURIComponent(id)}`),
+    queryFn: () => api<BillPayment>(`/reload/payment/${encodeURIComponent(id)}`),
   });
 
-export const createBillPayment = (body: CreateBillPayment) => api<BillPayment>("/bill-collection/payment", { method: "POST", body });
+export const createBillPayment = (body: CreateBillPayment) => api<BillPayment>("/reload/payment", { method: "POST", body });
